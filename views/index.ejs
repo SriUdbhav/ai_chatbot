@@ -1,0 +1,164 @@
+<%- include('partials/header') %>
+
+<div class="container hero-section">
+  <!-- Hero Badge -->
+  <div class="hero-badge-wrapper">
+    <span class="badge-pill pulse-badge">
+      <span class="badge-dot"></span> Phase 1 Complete: Server & Templating Verified
+    </span>
+  </div>
+
+  <!-- Hero Header -->
+  <h1 class="hero-title">
+    <%= projectTitle %>
+  </h1>
+  <p class="hero-subtitle">
+    <%= tagline %>
+  </p>
+
+  <!-- Quick Status Grid -->
+  <div class="status-grid">
+    <div class="status-card">
+      <div class="card-icon status-green">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </div>
+      <div class="card-content">
+        <span class="card-label">Server Status</span>
+        <span class="card-value"><%= serverStatus %></span>
+      </div>
+    </div>
+
+    <div class="status-card">
+      <div class="card-icon status-blue">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+      </div>
+      <div class="card-content">
+        <span class="card-label">View Engine</span>
+        <span class="card-value">EJS Dynamic Rendering</span>
+      </div>
+    </div>
+
+    <div class="status-card">
+      <div class="card-icon status-purple">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+      </div>
+      <div class="card-content">
+        <span class="card-label">Node Runtime</span>
+        <span class="card-value"><%= nodeVersion %></span>
+      </div>
+    </div>
+
+    <div class="status-card">
+      <div class="card-icon <%= apiKeyConfigured ? 'status-green' : 'status-amber' %>">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+      </div>
+      <div class="card-content">
+        <span class="card-label">Google GenAI SDK</span>
+        <span class="card-value">
+          <%= apiKeyConfigured ? 'Key Configured (Ready)' : 'SDK Ready (Awaiting Key in .env)' %>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Diagnostics & Verification Card -->
+  <div class="diagnostic-card">
+    <div class="diagnostic-header">
+      <div class="diagnostic-title-group">
+        <span class="terminal-dots">
+          <span class="t-dot red"></span>
+          <span class="t-dot yellow"></span>
+          <span class="t-dot green"></span>
+        </span>
+        <h2 class="diagnostic-title">Architecture & System Diagnostics</h2>
+      </div>
+      <button id="ping-btn" class="action-btn" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+        <span>Test Server Round-Trip</span>
+      </button>
+    </div>
+
+    <div class="diagnostic-body">
+      <div class="diagnostic-row">
+        <span class="diag-key">Backend Framework:</span>
+        <span class="diag-val highlight">Express.js (REST API & SSR Router)</span>
+      </div>
+      <div class="diagnostic-row">
+        <span class="diag-key">Security Model:</span>
+        <span class="diag-val safe">No client-side API exposure (Strict Server-Side Proxy)</span>
+      </div>
+      <div class="diagnostic-row">
+        <span class="diag-key">Environment Config:</span>
+        <span class="diag-val">dotenv (<code class="code-inline">.env</code> active, <code class="code-inline">.gitignore</code> protected)</span>
+      </div>
+      <div class="diagnostic-row">
+        <span class="diag-key">Server Render Timestamp:</span>
+        <span class="diag-val" id="server-timestamp"><%= serverTimestamp %></span>
+      </div>
+      <div class="diagnostic-row">
+        <span class="diag-key">Live Round-Trip Test:</span>
+        <span class="diag-val" id="ping-result">Click &ldquo;Test Server Round-Trip&rdquo; to send a live fetch request</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Roadmap / Phases -->
+  <div class="section-container">
+    <div class="section-header">
+      <h2 class="section-title">Capstone Development Roadmap</h2>
+      <p class="section-desc">Phased delivery plan from foundation to full generative conversational study companion.</p>
+    </div>
+
+    <div class="phases-grid">
+      <% phases.forEach(function(phase) { %>
+        <div class="phase-card <%= phase.status === 'Completed' ? 'phase-completed' : 'phase-upcoming' %>">
+          <div class="phase-badge-row">
+            <span class="phase-number">Phase <%= phase.number %></span>
+            <span class="phase-status-tag <%= phase.status === 'Completed' ? 'tag-done' : 'tag-next' %>">
+              <%= phase.status %>
+            </span>
+          </div>
+          <h3 class="phase-title"><%= phase.title %></h3>
+          <p class="phase-text"><%= phase.description %></p>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+
+  <!-- Next Phase Preview Card -->
+  <div class="preview-banner">
+    <div class="preview-content">
+      <div class="preview-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </div>
+      <div>
+        <h3 class="preview-heading">Ready for Phase 2: Conversational Gemini Chatbot</h3>
+        <p class="preview-sub">
+          The server architecture, view engine, asset pipeline, and Google GenAI SDK are configured and verified. In Phase 2, we will integrate the chat UI and stream responses directly from your Gemini model.
+        </p>
+      </div>
+    </div>
+    <div class="preview-cta">
+      <span class="config-reminder">
+        Configure <code class="code-inline">GEMINI_API_KEY</code> in <code class="code-inline">.env</code> to activate
+      </span>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

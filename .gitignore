@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment Configuration (Contains sensitive API keys)
+.env
+.env.*
+!.env.example
+
+# Temporary / Build directories
+.dist/
+scratch/
+*.log
+npm-debug.log*
+
+# OS specific files
+.DS_Store
+Thumbs.db

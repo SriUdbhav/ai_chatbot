@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="StudyMate AI — Modern generative AI study assistant and academic companion powered by Google Gemini.">
+  <title><%= pageTitle ? pageTitle + ' | StudyMate AI' : 'StudyMate AI — Your Intelligent Academic Companion' %></title>
+
+  <!-- Google Fonts: Outfit for titles, Plus Jakarta Sans for body, JetBrains Mono for code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Application Stylesheets -->
+  <link rel="stylesheet" href="/css/chat.css">
+
+  <!-- Client-side Configuration -->
+  <script id="app-config" type="application/json">
+    <%- JSON.stringify({
+      apiKeyConfigured: typeof apiKeyConfigured !== 'undefined' ? apiKeyConfigured : false,
+      geminiModel: (typeof geminiModel !== 'undefined' && geminiModel) ? geminiModel : 'gemini-3.5-flash-lite',
+      chatApiUrl: '/api/chat',
+      toolsApiUrl: '/api/tools'
+    }) %>
+  </script>
+  <script>
+    try {
+      window.APP_CONFIG = JSON.parse(document.getElementById('app-config').textContent || '{}');
+    } catch (e) {
+      window.APP_CONFIG = {
+        apiKeyConfigured: false,
+        geminiModel: 'gemini-3.5-flash-lite',
+        chatApiUrl: '/api/chat',
+        toolsApiUrl: '/api/tools'
+      };
+    }
+  </script>
+</head>
+<body class="app-body" data-theme="dark">
+
+  <!-- ═══════════════════════════════════════════════════════
+       1. LEFT SIDEBAR — StudyMate AI Navigation & History
+  ═══════════════════════════════════════════════════════════ -->
+  <aside class="sidebar" id="sidebar" role="complementary" aria-label="StudyMate AI navigation and conversation history">
+
+    <!-- Brand Header -->
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">StudyMate AI</span>
+          <span class="brand-sub">Academic Companion</span>
+        </div>
+      </div>
+      <!-- Close button on mobile/tablet -->
+      <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Primary Action: New Chat -->
+    <div class="sidebar-action-wrap">
+      <button class="new-chat-btn" id="newChatBtn" aria-label="Start a new conversation">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>New Chat</span>
+      </button>
+    </div>
+
+    <!-- Main Navigation Items -->
+    <div class="sidebar-nav-section">
+      <p class="sidebar-label">Navigation</p>
+      <nav class="nav-menu" aria-label="Primary navigation">
+        <a href="/" class="nav-item active" id="navHome">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </span>
+          <span class="nav-text">Home</span>
+        </a>
+        <button type="button" class="nav-item" id="navSubjectNotes" title="Open Subject Notes Summarizer">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </span>
+          <span class="nav-text">Subject Notes</span>
+        </button>
+        <button type="button" class="nav-item" id="navPracticeQuiz" title="Open Practice & Quiz Generator">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </span>
+          <span class="nav-text">Practice &amp; Quiz</span>
+        </button>
+        <button type="button" class="nav-item" id="navStudyPlanner" title="Open Study Planner">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </span>
+          <span class="nav-text">Study Planner</span>
+        </button>
+        <button type="button" class="nav-item" id="navSavedItems" title="View Saved Notes & Responses">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <span class="nav-text">Saved Items</span>
+        </button>
+        <button type="button" class="nav-item" id="navSettings" title="StudyMate AI Settings">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <span class="nav-text">Settings</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- AI Study Tools Quick Triggers (Keeps verified IDs for test suites) -->
+    <div class="sidebar-tools-section">
+      <div class="sidebar-section-header">
+        <p class="sidebar-label">AI Study Tools</p>
+        <button type="button" class="open-all-tools-link" id="sidebarAllToolsLink">All Tools</button>
+      </div>
+      <div class="tools-grid">
+        <button class="tool-btn" data-tool="explain" id="sidebarToolExplain" title="Concept Explainer">
+          <span class="tool-icon">💡</span>
+          <span class="tool-text">Explainer</span>
+        </button>
+        <button class="tool-btn" data-tool="programming" id="sidebarToolProgramming" title="Programming Assistant">
+          <span class="tool-icon">💻</span>
+          <span class="tool-text">Code Help</span>
+        </button>
+        <button class="tool-btn" data-tool="summarize" id="sidebarToolSummarize" title="Notes Summarizer">
+          <span class="tool-icon">📝</span>
+          <span class="tool-text">Summarizer</span>
+        </button>
+        <button class="tool-btn" data-tool="quiz" id="sidebarToolQuiz" title="AI Quiz Generator">
+          <span class="tool-icon">🎯</span>
+          <span class="tool-text">AI Quiz</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Chat History List -->
+    <div class="sidebar-section convo-section">
+      <div class="sidebar-section-header">
+        <p class="sidebar-label">Chat History</p>
+        <button type="button" class="sidebar-clear-all-btn" id="sidebarClearAllBtn" title="Clear all conversation history" aria-label="Clear all conversations">Clear All</button>
+      </div>
+      <nav class="convo-list" id="convoList" aria-label="Recent conversations">
+        <p class="convo-empty" id="convoEmpty">No conversations yet.<br>Start your first session above!</p>
+      </nav>
+    </div>
+
+    <!-- Sidebar Footer: Status & Model -->
+    <div class="sidebar-footer">
+      <div class="api-status-pill" id="apiStatusPill" title="Connected AI Engine">
+        <span class="status-dot <%- apiKeyConfigured ? 'dot-green' : 'dot-amber' %>"></span>
+        <span class="status-text">
+          <%- apiKeyConfigured ? 'Gemini AI Connected' : 'API Key Missing' %>
+        </span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sidebar Overlay for Mobile/Tablet -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       2. MAIN APPLICATION WORKSPACE
+  ═══════════════════════════════════════════════════════════ -->
+  <div class="app-workspace">
+
+    <!-- ── Center Chat Panel ── -->
+    <div class="chat-layout">
+
+      <!-- Top Navigation Bar -->
+      <header class="chat-topbar">
+        <div class="topbar-left">
+          <button class="topbar-menu-btn" id="sidebarOpenBtn" aria-label="Open sidebar" title="Toggle Navigation Sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <div class="topbar-title-wrap">
+            <h1 class="topbar-title" id="topbarTitle">StudyMate AI</h1>
+            <span class="topbar-subtitle">Academic Assistant</span>
+          </div>
+        </div>
+
+        <div class="topbar-center">
+          <!-- Search chats, topics or subjects -->
+          <div class="topbar-search-wrap" role="search">
+            <span class="topbar-search-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <input
+              type="search"
+              id="chatSearchInput"
+              class="topbar-search-input"
+              placeholder="Search chats, topics or subjects…"
+              aria-label="Search chats, topics or subjects"
+            >
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <!-- Learning Mode Selector -->
+          <div class="mode-selector-wrapper" title="Change Study Mode Guidance">
+            <span class="mode-badge-label">Mode:</span>
+            <select class="mode-select" id="studyModeSelect" aria-label="Select study mode">
+              <option value="standard" selected>🎓 Standard Academic</option>
+              <option value="simple">💡 Simple Explanation</option>
+              <option value="step_by_step">🪜 Step-by-Step</option>
+              <option value="exam_prep">📋 Exam Prep</option>
+              <option value="practice">❓ Practice Questions</option>
+              <option value="code_focus">💻 Code Focus</option>
+            </select>
+          </div>
+
+          <!-- Tools Modal Button -->
+          <button class="topbar-tools-btn" id="openToolsBtn" title="Open AI Study Tools Modal" aria-label="Open AI Study Tools">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+            </svg>
+            <span>Tools</span>
+          </button>
+
+          <!-- Theme Toggle Button -->
+          <button type="button" class="icon-btn theme-toggle-btn" id="themeToggleBtn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
+            <svg class="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+
+          <!-- Notification Icon & Dropdown -->
+          <div class="notif-wrapper">
+            <button type="button" class="icon-btn notif-btn" id="notifBtn" title="Study Notifications" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <span class="notif-badge" id="notifBadge" aria-hidden="true"></span>
+            </button>
+            <div class="notif-dropdown" id="notifDropdown" hidden>
+              <div class="notif-header">
+                <h4>Study Alerts</h4>
+                <button type="button" class="notif-dismiss-btn" id="notifClearBtn">Dismiss</button>
+              </div>
+              <ul class="notif-list">
+                <li class="notif-item unread">
+                  <span class="notif-emoji">💡</span>
+                  <div class="notif-info">
+                    <p class="notif-msg">Welcome to <strong>StudyMate AI</strong>! Ask questions or launch practice quizzes.</p>
+                    <span class="notif-time">Just now</span>
+                  </div>
+                </li>
+                <li class="notif-item">
+                  <span class="notif-emoji">🎯</span>
+                  <div class="notif-info">
+                    <p class="notif-msg">Gemini 3.5 Flash-Lite active with fast responses.</p>
+                    <span class="notif-time">Connected</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Simple Profile Display (No auth required) -->
+          <div class="profile-chip" id="profileChip" title="Active Student Session (Local Guest)">
+            <div class="profile-avatar">S</div>
+            <div class="profile-meta">
+              <span class="profile-name">Student</span>
+              <span class="profile-status"><span class="status-dot dot-green"></span>Active</span>
+            </div>
+          </div>
+
+          <!-- Toggle Right Study Panel -->
+          <button class="icon-btn study-panel-toggle-btn" id="studyPanelToggleBtn" title="Toggle Study Insights Panel" aria-label="Toggle Study Panel">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+          </button>
+
+          <!-- Clear Chat -->
+          <button class="icon-btn" id="clearChatBtn" title="Clear current conversation" aria-label="Clear current conversation">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Message Area -->
+      <main class="messages-area" id="messagesArea" role="log" aria-live="polite" aria-label="Conversation Messages">
+
+        <!-- Welcome / Empty State Screen -->
+        <div class="welcome-screen" id="welcomeScreen">
+          <div class="welcome-badge">
+            <span class="badge-dot"></span>
+            <span>Powered by Google Gemini</span>
+          </div>
+
+          <div class="welcome-hero">
+            <div class="welcome-icon" aria-hidden="true">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <h2 class="welcome-title">How can StudyMate help you learn today?</h2>
+            <p class="welcome-sub">Ask questions, explore structured concept walkthroughs, debug code, and generate interactive quizzes.</p>
+          </div>
+
+          <% if (!apiKeyConfigured) { %>
+          <div class="api-warning" role="alert">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span><strong>Gemini API key not configured.</strong> Set <code>GEMINI_API_KEY</code> in your <code>.env</code> file to enable live AI responses.</span>
+          </div>
+          <% } %>
+
+          <!-- Featured Tools Quick Cards -->
+          <div class="featured-tools-row" aria-label="Featured study tools">
+            <button class="featured-tool-card" data-tool="explain">
+              <span class="card-emoji">💡</span>
+              <div class="card-info">
+                <span class="card-name">Concept Explainer</span>
+                <span class="card-desc">Tailored academic levels & analogies</span>
+              </div>
+            </button>
+            <button class="featured-tool-card" data-tool="programming">
+              <span class="card-emoji">💻</span>
+              <div class="card-info">
+                <span class="card-name">Code Assistant</span>
+                <span class="card-desc">Debug, explain logic & Big-O complexity</span>
+              </div>
+            </button>
+            <button class="featured-tool-card" data-tool="summarize">
+              <span class="card-emoji">📝</span>
+              <div class="card-info">
+                <span class="card-name">Notes Summarizer</span>
+                <span class="card-desc">Condense lecture notes into revisions</span>
+              </div>
+            </button>
+            <button class="featured-tool-card" data-tool="quiz">
+              <span class="card-emoji">🎯</span>
+              <div class="card-info">
+                <span class="card-name">AI Quiz Gen</span>
+                <span class="card-desc">Interactive scored practice questions</span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Empty-State Suggestions Grid (includes required prompts) -->
+          <div class="suggestions-grid" id="suggestionsGrid" aria-label="Suggested study questions">
+
+            <!-- Computer Science & DSA Group -->
+            <div class="suggestion-group">
+              <div class="suggestion-group-header">
+                <span class="suggestion-group-icon" aria-hidden="true">💻</span>
+                <h3 class="suggestion-group-title">Computer Science</h3>
+              </div>
+              <button class="suggestion-chip" data-prompt="Explain DSA with examples. Start with fundamental structures like arrays, linked lists, stacks, and trees, then walk through key algorithms with clear visual intuition.">
+                Explain DSA with examples
+              </button>
+              <button class="suggestion-chip" data-prompt="Teach me DBMS. Cover relational database concepts, primary vs foreign keys, normalization (1NF to 3NF), and core SQL queries with concrete examples.">
+                Teach me DBMS
+              </button>
+              <button class="suggestion-chip" data-prompt="Help me debug Python code. What are the most common Python bugs (IndexError, TypeError, KeyError) and how do I troubleshoot them step-by-step?">
+                Help me debug Python code
+              </button>
+              <button class="suggestion-chip" data-prompt="What is Big O notation? Explain with simple examples for O(1), O(log n), O(n), and O(n²).">
+                What is Big O notation?
+              </button>
+            </div>
+
+            <!-- Mathematics & Engineering Group -->
+            <div class="suggestion-group">
+              <div class="suggestion-group-header">
+                <span class="suggestion-group-icon" aria-hidden="true">📐</span>
+                <h3 class="suggestion-group-title">Mathematics</h3>
+              </div>
+              <button class="suggestion-chip" data-prompt="Explain the chain rule in calculus with two worked step-by-step examples.">
+                Explain the chain rule in calculus
+              </button>
+              <button class="suggestion-chip" data-prompt="What is a matrix and how do you multiply two matrices? Show a concrete worked numerical example.">
+                How do you multiply two matrices?
+              </button>
+              <button class="suggestion-chip" data-prompt="Explain what a derivative represents geometrically and how it connects to tangents and rates of change.">
+                What does a derivative mean geometrically?
+              </button>
+            </div>
+
+            <!-- Science & Medicine Group -->
+            <div class="suggestion-group">
+              <div class="suggestion-group-header">
+                <span class="suggestion-group-icon" aria-hidden="true">🔬</span>
+                <h3 class="suggestion-group-title">Natural Sciences</h3>
+              </div>
+              <button class="suggestion-chip" data-prompt="Explain Newton's three laws of motion with everyday real-world examples for each.">
+                Explain Newton's three laws of motion
+              </button>
+              <button class="suggestion-chip" data-prompt="How does photosynthesis work? Break down the light-dependent and Calvin cycle steps in clear, simple language.">
+                How does photosynthesis work?
+              </button>
+              <button class="suggestion-chip" data-prompt="What is the difference between DNA and RNA? Compare their structure, bases, and biological roles.">
+                Difference between DNA and RNA
+              </button>
+            </div>
+
+            <!-- Humanities & General Knowledge Group -->
+            <div class="suggestion-group">
+              <div class="suggestion-group-header">
+                <span class="suggestion-group-icon" aria-hidden="true">🌐</span>
+                <h3 class="suggestion-group-title">General &amp; Study Skills</h3>
+              </div>
+              <button class="suggestion-chip" data-prompt="What is the Feynman Technique for studying and how can I apply it to master difficult STEM topics?">
+                Feynman Technique for studying
+              </button>
+              <button class="suggestion-chip" data-prompt="Explain how the internet works from the moment I type a URL in the browser and press Enter.">
+                How does the internet work?
+              </button>
+              <button class="suggestion-chip" data-prompt="What caused the Industrial Revolution and what were its primary societal and technological impacts?">
+                Causes of the Industrial Revolution
+              </button>
+            </div>
+
+          </div><!-- /suggestions-grid -->
+        </div><!-- /welcome-screen -->
+
+        <!-- Dynamic Message Container -->
+        <div class="messages-inner" id="messagesInner" style="display: none;"></div>
+
+      </main><!-- /messages-area -->
+
+      <!-- ── Message Composer ── -->
+      <footer class="composer-area">
+        <div class="composer-container">
+
+        <!-- ChatGPT-Style Quick Pills -->
+        <div class="quick-tools-bar" id="quickToolsBar" aria-label="Quick AI study tools and modes">
+          <button type="button" class="quick-pill" data-quick="explain" title="Ask AI to explain a concept clearly">
+            <span class="quick-pill-emoji">💡</span> Explain Concept
+          </button>
+          <button type="button" class="quick-pill" data-quick="code" title="Ask AI for programming solution, debug or code">
+            <span class="quick-pill-emoji">💻</span> Code &amp; Solution
+          </button>
+          <button type="button" class="quick-pill" data-quick="summarize" title="Summarize lecture notes or revision sheet">
+            <span class="quick-pill-emoji">📝</span> Summarize Notes
+          </button>
+          <button type="button" class="quick-pill" data-quick="quiz" title="Generate an interactive practice quiz">
+            <span class="quick-pill-emoji">🎯</span> Practice Quiz
+          </button>
+          <button type="button" class="quick-pill" data-quick="step" title="Break down solution step-by-step">
+            <span class="quick-pill-emoji">🪜</span> Step-by-Step
+          </button>
+        </div>
+
+        <!-- Chat Form -->
+        <form class="composer" id="chatForm" autocomplete="off" aria-label="Send a message to StudyMate AI">
+          <div class="composer-inner">
+            <textarea
+              class="composer-input"
+              id="messageInput"
+              placeholder="Ask anything or request a solution… (Shift+Enter for new line)"
+              rows="1"
+              maxlength="4000"
+              aria-label="Message input"
+              aria-multiline="true"
+            ></textarea>
+
+            <div class="composer-controls">
+              <!-- Speech Dictation -->
+              <button class="composer-icon-btn mic-btn" id="micBtn" type="button" aria-label="Voice input" title="Voice dictation (Speak your question)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              </button>
+
+              <!-- Stop Generating Button -->
+              <button class="stop-btn" id="stopBtn" type="button" aria-label="Stop generating" title="Stop generating response" hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+                </svg>
+                <span>Stop</span>
+              </button>
+
+              <!-- Send Button -->
+              <button class="send-btn" id="sendBtn" type="submit" aria-label="Send message" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <p class="composer-hint" id="composerHint">
+            Active mode: <strong>Standard Academic</strong>. Enter sends, Shift+Enter for newline.
+          </p>
+        </form>
+        </div><!-- /composer-container -->
+      </footer>
+
+    </div><!-- /chat-layout -->
+
+    <!-- ── 3. RIGHT-SIDE CONTEXTUAL STUDY PANEL (Desktop + Mobile Drawer) ── -->
+    <aside class="study-panel" id="studyPanel" role="complementary" aria-label="Contextual Study Panel">
+      
+      <!-- Panel Header -->
+      <div class="panel-header">
+        <div class="panel-header-title">
+          <span class="panel-header-icon">📚</span>
+          <span>Study Companion</span>
+        </div>
+        <button class="panel-close-btn" id="studyPanelCloseBtn" aria-label="Close study panel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="panel-content">
+
+        <!-- Active Session Card -->
+        <div class="panel-card session-card">
+          <div class="card-pill">Active Session</div>
+          <h4 class="session-card-title" id="panelSessionTitle">New Study Session</h4>
+          <div class="session-stats">
+            <div class="stat-item">
+              <span class="stat-number" id="panelMsgCount">0</span>
+              <span class="stat-name">Messages</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="panelActiveModeBadge">Academic</span>
+              <span class="stat-name">Mode</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Study Tools & Actions (Requested 5 Actions) -->
+        <div class="panel-section">
+          <h4 class="panel-section-title">Study Tools &amp; Actions</h4>
+          <div class="action-tiles">
+            <button class="action-tile" data-action="explain-topic" title="Explain any academic topic">
+              <span class="tile-icon">💡</span>
+              <div class="tile-meta">
+                <span class="tile-title">Explain a topic</span>
+                <span class="tile-desc">Concepts &amp; step-by-step breakdowns</span>
+              </div>
+            </button>
+            <button class="action-tile" data-action="generate-notes" title="Generate structured study notes">
+              <span class="tile-icon">📚</span>
+              <div class="tile-meta">
+                <span class="tile-title">Generate notes</span>
+                <span class="tile-desc">High-yield revision sheets &amp; takeaways</span>
+              </div>
+            </button>
+            <button class="action-tile" data-action="solve-problem" title="Solve a programming or math problem">
+              <span class="tile-icon">🧩</span>
+              <div class="tile-meta">
+                <span class="tile-title">Solve a problem</span>
+                <span class="tile-desc">Algorithms, code &amp; complexity analysis</span>
+              </div>
+            </button>
+            <button class="action-tile" data-action="create-quiz" title="Generate an interactive quiz">
+              <span class="tile-icon">🎯</span>
+              <div class="tile-meta">
+                <span class="tile-title">Create a quiz</span>
+                <span class="tile-desc">Interactive scored practice questions</span>
+              </div>
+            </button>
+            <button class="action-tile" data-action="summarize-text" title="Summarize lecture notes or articles">
+              <span class="tile-icon">📝</span>
+              <div class="tile-meta">
+                <span class="tile-title">Summarize text</span>
+                <span class="tile-desc">Condense long textbook chapters &amp; notes</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recent Subject Tags -->
+        <div class="panel-section">
+          <h4 class="panel-section-title">Recent Subjects</h4>
+          <div class="subject-tags-wrap" id="subjectTagsWrap">
+            <button type="button" class="subject-tag" data-topic="Data Structures and Algorithms">#DataStructures</button>
+            <button type="button" class="subject-tag" data-topic="Key Sorting and Search Algorithms">#Algorithms</button>
+            <button type="button" class="subject-tag" data-topic="Database Management Systems (DBMS)">#DBMS</button>
+            <button type="button" class="subject-tag" data-topic="Python Programming and OOP">#Python</button>
+            <button type="button" class="subject-tag" data-topic="Operating Systems and Concurrency">#OperatingSystems</button>
+            <button type="button" class="subject-tag" data-topic="Calculus and Differential Equations">#Calculus</button>
+            <button type="button" class="subject-tag" data-topic="Computer Networks and Protocols">#Networks</button>
+            <button type="button" class="subject-tag" data-topic="Machine Learning Fundamentals">#MachineLearning</button>
+          </div>
+        </div>
+
+        <!-- Study Quick Notepad -->
+        <div class="panel-section">
+          <div class="section-title-row">
+            <h4 class="panel-section-title">Quick Notepad</h4>
+            <span class="notepad-status" id="notepadStatus">Saved locally</span>
+          </div>
+          <div class="notepad-card">
+            <textarea
+              class="quick-notepad-input"
+              id="quickNotepad"
+              placeholder="Jot down quick formulas, ideas, or questions for later..."
+              rows="4"
+              aria-label="Quick study notepad"
+            ></textarea>
+          </div>
+        </div>
+
+      </div><!-- /panel-content -->
+    </aside>
+
+  </div><!-- /app-workspace -->
+
+  <!-- Panel Backdrop for Mobile -->
+  <div class="study-panel-overlay" id="studyPanelOverlay"></div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       4. STUDY TOOLS MODAL (Preserves all verified IDs)
+  ═══════════════════════════════════════════════════════════ -->
+  <div class="modal-backdrop tools-modal-backdrop" id="toolsModal" role="dialog" aria-modal="true" aria-labelledby="toolsModalTitle" hidden>
+    <div class="tools-modal-card">
+
+      <!-- Modal Header -->
+      <div class="tools-modal-header">
+        <div class="tools-modal-brand">
+          <div class="tools-header-icon" aria-hidden="true">✨</div>
+          <div>
+            <h2 class="tools-modal-title" id="toolsModalTitle">AI Study Tools</h2>
+            <p class="tools-modal-sub">Accelerate your learning with specialized Gemini capabilities</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="closeToolsModalBtn" aria-label="Close tools modal">✕</button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="tools-tabs" role="tablist" aria-label="Study tool categories">
+        <button class="tool-tab active" data-tab="explain" role="tab" aria-selected="true" id="tabExplain">
+          <span class="tab-icon">💡</span>
+          <span>Concept Explainer</span>
+        </button>
+        <button class="tool-tab" data-tab="programming" role="tab" aria-selected="false" id="tabProgramming">
+          <span class="tab-icon">💻</span>
+          <span>Code Assistant</span>
+        </button>
+        <button class="tool-tab" data-tab="summarize" role="tab" aria-selected="false" id="tabSummarize">
+          <span class="tab-icon">📝</span>
+          <span>Notes Summarizer</span>
+        </button>
+        <button class="tool-tab" data-tab="quiz" role="tab" aria-selected="false" id="tabQuiz">
+          <span class="tab-icon">🎯</span>
+          <span>AI Quiz Generator</span>
+        </button>
+      </div>
+
+      <!-- Tab Panels Container -->
+      <div class="tools-content">
+
+        <!-- ── PANE 1: CONCEPT EXPLAINER ── -->
+        <div class="tool-pane active" id="paneExplain" role="tabpanel" aria-labelledby="tabExplain">
+          <div class="pane-intro">
+            <h3>Concept Explainer</h3>
+            <p>Get a comprehensive explanation of any academic topic calibrated precisely to your level and style.</p>
+          </div>
+
+          <form class="tool-form" id="explainForm">
+            <div class="form-group">
+              <label for="explainTopic">Topic or Concept <span class="required">*</span></label>
+              <input type="text" id="explainTopic" class="form-input" placeholder="e.g. Recursion, Fourier Transform, Photosynthesis..." required maxlength="500">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="explainLevel">Your Current Level</label>
+                <select id="explainLevel" class="form-select">
+                  <option value="beginner">Beginner (Intuitive & friendly)</option>
+                  <option value="intermediate" selected>Intermediate (Collegiate standard)</option>
+                  <option value="advanced">Advanced (Deep technical rigor)</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="explainStyle">Explanation Style</label>
+                <select id="explainStyle" class="form-select">
+                  <option value="simple">Simple (Plain analogies)</option>
+                  <option value="step_by_step" selected>Step-by-Step (Sequential breakdown)</option>
+                  <option value="detailed">Detailed (Comprehensive coverage)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-checkbox-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="explainExamples" checked>
+                <span>Include concrete real-world examples</span>
+              </label>
+            </div>
+
+            <button type="submit" class="tool-submit-btn" id="explainSubmitBtn">
+              <span>Explain Concept in Chat</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- ── PANE 2: PROGRAMMING ASSISTANT ── -->
+        <div class="tool-pane" id="paneProgramming" role="tabpanel" aria-labelledby="tabProgramming" hidden>
+          <div class="pane-intro">
+            <h3>Programming Assistant</h3>
+            <p>Debug errors, write idiomatic code, dissect complex logic, and analyze Big-O time and space complexity.</p>
+          </div>
+
+          <form class="tool-form" id="programmingForm">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="progLanguage">Language</label>
+                <select id="progLanguage" class="form-select">
+                  <option value="JavaScript">JavaScript</option>
+                  <option value="Python" selected>Python</option>
+                  <option value="Java">Java</option>
+                  <option value="C++">C++</option>
+                  <option value="C">C</option>
+                  <option value="SQL">SQL</option>
+                  <option value="TypeScript">TypeScript</option>
+                  <option value="Go">Go</option>
+                  <option value="Rust">Rust</option>
+                  <option value="General">Other / Pseudocode</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="progMode">Help Mode</label>
+                <select id="progMode" class="form-select">
+                  <option value="explain">Explain Code</option>
+                  <option value="debug" selected>Debug Code / Fix Bug</option>
+                  <option value="generate">Generate Code</option>
+                  <option value="complexity">Complexity Analysis (Big-O)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="progDescription">Question, Task, or Error Description <span class="required">*</span></label>
+              <textarea id="progDescription" class="form-textarea" rows="3" placeholder="Describe what you want to achieve or paste an error trace..." required maxlength="4000"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="progCode">Optional Code Snippet</label>
+              <textarea id="progCode" class="form-textarea code-font" rows="5" placeholder="// Paste your code here (optional)..." maxlength="8000"></textarea>
+            </div>
+
+            <button type="submit" class="tool-submit-btn" id="progSubmitBtn">
+              <span>Analyze &amp; Stream Solution</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- ── PANE 3: NOTES SUMMARIZER ── -->
+        <div class="tool-pane" id="paneSummarize" role="tabpanel" aria-labelledby="tabSummarize" hidden>
+          <div class="pane-intro">
+            <h3>Notes Summarizer</h3>
+            <p>Paste lecture notes, study guides, or textbook excerpts to generate organized revision sheets.</p>
+          </div>
+
+          <form class="tool-form" id="summarizeForm">
+            <div class="form-group">
+              <div class="label-with-meta">
+                <label for="summarizeNotes">Your Notes <span class="required">*</span></label>
+                <span class="char-counter" id="notesCharCounter">0 / 15,000</span>
+              </div>
+              <textarea id="summarizeNotes" class="form-textarea" rows="6" placeholder="Paste your study notes, lecture transcript, or chapter text here..." required maxlength="15000"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="summarizeStyle">Summary Style</label>
+                <select id="summarizeStyle" class="form-select">
+                  <option value="quick_revision" selected>Quick Revision (High-yield key points)</option>
+                  <option value="detailed">Detailed Summary (Comprehensive breakdown)</option>
+                  <option value="exam_prep">Exam Prep (Definitions & sample questions)</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="summarizeLength">Desired Length</label>
+                <select id="summarizeLength" class="form-select">
+                  <option value="concise">Concise (~200 words)</option>
+                  <option value="standard" selected>Standard (~450 words)</option>
+                  <option value="comprehensive">Comprehensive (~800 words)</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" class="tool-submit-btn" id="summarizeSubmitBtn">
+              <span>Generate Summary in Chat</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- ── PANE 4: AI QUIZ GENERATOR ── -->
+        <div class="tool-pane" id="paneQuiz" role="tabpanel" aria-labelledby="tabQuiz" hidden>
+          <div class="pane-intro">
+            <h3>AI Quiz Generator</h3>
+            <p>Generate interactive, dynamically scored quizzes to test your mastery of any academic topic.</p>
+          </div>
+
+          <form class="tool-form" id="quizForm">
+            <div class="form-group">
+              <label for="quizTopic">Topic or Subject <span class="required">*</span></label>
+              <input type="text" id="quizTopic" class="form-input" placeholder="e.g. Data Structures, Cell Respiration, Roman History..." required maxlength="300">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="quizDifficulty">Difficulty</label>
+                <select id="quizDifficulty" class="form-select">
+                  <option value="easy">Easy (Fundamentals)</option>
+                  <option value="medium" selected>Medium (Application)</option>
+                  <option value="hard">Hard (Advanced mastery)</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="quizCount">Question Count</label>
+                <select id="quizCount" class="form-select">
+                  <option value="3">3 Questions</option>
+                  <option value="5" selected>5 Questions</option>
+                  <option value="8">8 Questions</option>
+                  <option value="10">10 Questions</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="quizType">Question Format</label>
+                <select id="quizType" class="form-select">
+                  <option value="mcq" selected>Multiple Choice</option>
+                  <option value="short">Short Answer</option>
+                  <option value="mixed">Mixed (MCQ + Short)</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" class="tool-submit-btn" id="quizSubmitBtn">
+              <span>Generate Interactive Quiz</span>
+            </button>
+          </form>
+        </div>
+
+      </div><!-- /tools-content -->
+
+    </div><!-- /tools-modal-card -->
+  </div><!-- /toolsModal -->
+
+  <!-- ═══════════════════════════════════════════════════════
+       5. FEATURE MODALS: Study Planner, Saved Items, Settings
+  ═══════════════════════════════════════════════════════════ -->
+
+  <!-- Study Planner Modal -->
+  <div class="modal-backdrop" id="plannerModal" role="dialog" aria-modal="true" aria-labelledby="plannerModalTitle" hidden>
+    <div class="modal-card wide-modal-card">
+      <div class="modal-header-simple">
+        <div class="modal-title-with-icon">
+          <span class="modal-badge-icon">📅</span>
+          <div>
+            <h3 class="modal-title" id="plannerModalTitle">AI Study Planner</h3>
+            <p class="modal-desc">Generate an optimized study schedule for your upcoming exams or topics.</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-x" id="plannerCloseBtn" aria-label="Close study planner">✕</button>
+      </div>
+
+      <div class="planner-body">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="plannerSubject">Subject or Exam</label>
+            <input type="text" id="plannerSubject" class="form-input" placeholder="e.g. Data Structures Midterm, Calculus II Final...">
+          </div>
+          <div class="form-group flex-1">
+            <label for="plannerDays">Timeframe</label>
+            <select id="plannerDays" class="form-select">
+              <option value="3">3-Day Sprint</option>
+              <option value="7" selected>7-Day Schedule</option>
+              <option value="14">2-Week Plan</option>
+              <option value="30">1-Month Roadmap</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="plannerHours">Available Study Hours per Day</label>
+          <select id="plannerHours" class="form-select">
+            <option value="1-2">1–2 Hours (Light review)</option>
+            <option value="2-4" selected>2–4 Hours (Standard)</option>
+            <option value="4+">4+ Hours (Intensive prep)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-modal btn-cancel" id="plannerCancelBtn">Close</button>
+        <button type="button" class="btn-modal btn-primary" id="plannerGenerateBtn">Create Plan in Chat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Saved Items Modal -->
+  <div class="modal-backdrop" id="savedItemsModal" role="dialog" aria-modal="true" aria-labelledby="savedModalTitle" hidden>
+    <div class="modal-card">
+      <div class="modal-header-simple">
+        <div class="modal-title-with-icon">
+          <span class="modal-badge-icon">🔖</span>
+          <div>
+            <h3 class="modal-title" id="savedModalTitle">Saved Items &amp; Notes</h3>
+            <p class="modal-desc">Access bookmarked solutions and study snippets stored in this browser.</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-x" id="savedCloseBtn" aria-label="Close saved items">✕</button>
+      </div>
+      <div class="saved-items-list" id="savedItemsList">
+        <p class="convo-empty">No bookmarked messages yet.<br>Click the bookmark icon on any AI response to save key explanations here!</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-modal btn-cancel" id="savedDismissBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-backdrop" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" hidden>
+    <div class="modal-card">
+      <div class="modal-header-simple">
+        <div class="modal-title-with-icon">
+          <span class="modal-badge-icon">⚙️</span>
+          <div>
+            <h3 class="modal-title" id="settingsModalTitle">Preferences &amp; Diagnostics</h3>
+            <p class="modal-desc">Customize your study environment and check backend AI status.</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-x" id="settingsCloseBtn" aria-label="Close settings">✕</button>
+      </div>
+
+      <div class="settings-body">
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-name">Connected AI Model</span>
+            <span class="setting-desc" id="settingsModelName"><%= geminiModel || 'gemini-3.5-flash-lite' %></span>
+          </div>
+          <span class="status-badge-inline <%- apiKeyConfigured ? 'status-online' : 'status-offline' %>">
+            <%- apiKeyConfigured ? 'Online' : 'Missing Key' %>
+          </span>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-name">Storage Mechanism</span>
+            <span class="setting-desc">Local client storage (browser localStorage)</span>
+          </div>
+          <button type="button" class="btn-secondary-sm" id="clearAllHistoryBtn">Clear All History</button>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-name">Speech Dictation</span>
+            <span class="setting-desc">Browser SpeechRecognition Web API</span>
+          </div>
+          <span class="status-badge-inline status-online">Supported</span>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-modal btn-primary" id="settingsDoneBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Conversation Modal -->
+  <div class="modal-backdrop" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle" hidden>
+    <div class="modal-card">
+      <div class="modal-icon-warn" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+          <path d="M10 11v6"></path>
+          <path d="M14 11v6"></path>
+          <path d="M9 6V4h6v2"></path>
+        </svg>
+      </div>
+      <h3 class="modal-title" id="deleteModalTitle">Delete Conversation?</h3>
+      <p class="modal-desc" id="deleteModalDesc">This conversation and its message history will be permanently removed from this browser.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-modal btn-cancel" id="deleteModalCancel">Cancel</button>
+        <button type="button" class="btn-modal btn-danger" id="deleteModalConfirm">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notifications container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- Application Logic -->
+  <script src="/js/chat.js"></script>
+
+</body>
+</html>
