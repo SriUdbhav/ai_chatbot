@@ -217,6 +217,17 @@
             </select>
           </div>
 
+          <!-- Document Studio Modal Trigger Button -->
+          <button class="topbar-tools-btn topbar-doc-btn" id="openDocStudioBtn" title="AI Document Reader & Study Notes (PDF, DOCX, TXT)" aria-label="Upload Document and Generate Notes">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="12" y1="18" x2="12" y2="12"></line>
+              <line x1="9" y1="15" x2="15" y2="15"></line>
+            </svg>
+            <span>Upload Doc</span>
+          </button>
+
           <!-- Tools Modal Button -->
           <button class="topbar-tools-btn" id="openToolsBtn" title="Open AI Study Tools Modal" aria-label="Open AI Study Tools">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -354,6 +365,13 @@
                 <span class="card-desc">Interactive scored practice questions</span>
               </div>
             </button>
+            <button class="featured-tool-card featured-doc-card" id="featuredDocCard" data-tool="document">
+              <span class="card-emoji">📄</span>
+              <div class="card-info">
+                <span class="card-name">Document Reader</span>
+                <span class="card-desc">Upload PDF / DOCX for 9-part notes &amp; Q&amp;A</span>
+              </div>
+            </button>
           </div>
 
           <!-- Empty-State Suggestions Grid (includes required prompts) -->
@@ -444,6 +462,9 @@
 
         <!-- ChatGPT-Style Quick Pills -->
         <div class="quick-tools-bar" id="quickToolsBar" aria-label="Quick AI study tools and modes">
+          <button type="button" class="quick-pill quick-pill-doc" id="quickDocPill" data-quick="document" title="Upload a PDF, DOCX or TXT document to read, summarize and chat">
+            <span class="quick-pill-emoji">📄</span> Upload Document
+          </button>
           <button type="button" class="quick-pill" data-quick="explain" title="Ask AI to explain a concept clearly">
             <span class="quick-pill-emoji">💡</span> Explain Concept
           </button>
@@ -551,6 +572,13 @@
               <div class="tile-meta">
                 <span class="tile-title">Explain a topic</span>
                 <span class="tile-desc">Concepts &amp; step-by-step breakdowns</span>
+              </div>
+            </button>
+            <button class="action-tile" data-action="upload-document" id="panelUploadDocBtn" title="Upload PDF, DOCX, or TXT document">
+              <span class="tile-icon">📄</span>
+              <div class="tile-meta">
+                <span class="tile-title">Upload document</span>
+                <span class="tile-desc">Extract text, 9-part notes &amp; Q&amp;A</span>
               </div>
             </button>
             <button class="action-tile" data-action="generate-notes" title="Generate structured study notes">
@@ -858,6 +886,276 @@
 
     </div><!-- /tools-modal-card -->
   </div><!-- /toolsModal -->
+
+  <!-- ═══════════════════════════════════════════════════════
+       DOCUMENT STUDIO MODAL — Document Reader & AI Study Notes
+  ═══════════════════════════════════════════════════════════ -->
+  <div class="modal-backdrop doc-modal-backdrop" id="docStudioModal" role="dialog" aria-modal="true" aria-labelledby="docStudioTitle" hidden>
+    <div class="doc-studio-card">
+
+      <!-- Modal Header -->
+      <div class="doc-modal-header">
+        <div class="doc-header-brand">
+          <div class="doc-header-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </div>
+          <div>
+            <div class="doc-title-row">
+              <h2 class="doc-modal-title" id="docStudioTitle">Document Reader &amp; AI Study Notes</h2>
+              <span class="doc-status-badge" id="docStatusBadge">No document</span>
+            </div>
+            <p class="doc-modal-sub">Upload PDF, DOCX, or TXT to extract knowledge, generate 9-part study notes, and chat with your source</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="closeDocStudioBtn" aria-label="Close Document Studio">✕</button>
+      </div>
+
+      <!-- Navigation Tabs (Workflow Steps) -->
+      <div class="doc-tabs" role="tablist" aria-label="Document Reader workflow">
+        <button class="doc-tab active" data-tab="upload" role="tab" aria-selected="true" id="tabDocUpload">
+          <span class="tab-step">1</span>
+          <span class="tab-icon">📤</span>
+          <span>Upload Document</span>
+        </button>
+        <button class="doc-tab" data-tab="notes" role="tab" aria-selected="false" id="tabDocNotes">
+          <span class="tab-step">2</span>
+          <span class="tab-icon">📝</span>
+          <span>Study Notes (9 Sections)</span>
+        </button>
+        <button class="doc-tab" data-tab="chat" role="tab" aria-selected="false" id="tabDocChat">
+          <span class="tab-step">3</span>
+          <span class="tab-icon">💬</span>
+          <span>Chat with Document</span>
+        </button>
+        <button class="doc-tab" data-tab="text" role="tab" aria-selected="false" id="tabDocText">
+          <span class="tab-step">4</span>
+          <span class="tab-icon">📄</span>
+          <span>Extracted Text</span>
+        </button>
+      </div>
+
+      <!-- Content Panes Container -->
+      <div class="doc-content-wrapper">
+
+        <!-- ── PANE 1: UPLOAD & INSPECT ── -->
+        <div class="doc-pane active" id="paneDocUpload" role="tabpanel" aria-labelledby="tabDocUpload">
+          
+          <!-- Dropzone Area -->
+          <div class="doc-dropzone" id="docDropzone" tabindex="0" role="region" aria-label="File upload dropzone">
+            <input type="file" id="docFileInput" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain" style="display:none;">
+            <div class="dropzone-icon" aria-hidden="true">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+            <h3 class="dropzone-title">Drag &amp; drop your study document here</h3>
+            <p class="dropzone-sub">or <button type="button" class="btn-link" id="docBrowseBtn">browse files from your device</button></p>
+            <div class="dropzone-tags">
+              <span class="doc-format-pill">PDF (.pdf)</span>
+              <span class="doc-format-pill">Word (.docx)</span>
+              <span class="doc-format-pill">Plain Text (.txt)</span>
+              <span class="doc-format-pill pill-muted">Max 10 MB</span>
+            </div>
+          </div>
+
+          <!-- Progress Bar Wrap -->
+          <div class="doc-progress-wrap" id="docProgressWrap" hidden>
+            <div class="doc-progress-meta">
+              <span class="progress-title" id="docProgressText">Reading document...</span>
+              <span class="progress-percent" id="docProgressPercent">0%</span>
+            </div>
+            <div class="doc-progress-track">
+              <div class="doc-progress-fill" id="docProgressFill"></div>
+            </div>
+          </div>
+
+          <!-- Error Alert Banner -->
+          <div class="doc-alert-box alert-error" id="docErrorBanner" hidden role="alert">
+            <div class="alert-icon">⚠️</div>
+            <div class="alert-content">
+              <h4 class="alert-title" id="docErrorTitle">Upload Failed</h4>
+              <p class="alert-desc" id="docErrorMessage">Please upload a valid PDF, DOCX, or TXT file under 10 MB.</p>
+            </div>
+            <button type="button" class="alert-dismiss-btn" id="docErrorDismissBtn" aria-label="Dismiss error">✕</button>
+          </div>
+
+          <!-- Active Document Metadata Card -->
+          <div class="doc-meta-card" id="docMetaCard" hidden>
+            <div class="meta-card-header">
+              <div class="meta-card-type-icon" id="docTypeIcon">📄</div>
+              <div class="meta-card-info">
+                <h4 class="meta-card-filename" id="docMetaFilename">document.pdf</h4>
+                <div class="meta-badges-row">
+                  <span class="meta-pill" id="docMetaType">PDF</span>
+                  <span class="meta-pill" id="docMetaSize">1.2 MB</span>
+                  <span class="meta-pill" id="docMetaPages">1 Page</span>
+                  <span class="meta-pill" id="docMetaWords">0 Words</span>
+                </div>
+              </div>
+              <button type="button" class="btn-remove-doc" id="docRemoveBtn" title="Remove Document" aria-label="Remove document">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                <span>Remove</span>
+              </button>
+            </div>
+
+            <!-- Workflow Quick Next Actions -->
+            <div class="meta-card-actions">
+              <button type="button" class="btn-doc-action btn-doc-primary" id="docQuickNotesBtn">
+                <span>📝 Generate 9-Part Study Notes</span>
+              </button>
+              <button type="button" class="btn-doc-action btn-doc-secondary" id="docQuickChatBtn">
+                <span>💬 Chat with this Document</span>
+              </button>
+              <button type="button" class="btn-doc-action btn-doc-outline" id="docQuickTextBtn">
+                <span>👁️ View Extracted Text</span>
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /paneDocUpload -->
+
+        <!-- ── PANE 2: SUMMARIZED STUDY NOTES (9 SECTIONS) ── -->
+        <div class="doc-pane" id="paneDocNotes" role="tabpanel" aria-labelledby="tabDocNotes" hidden>
+          
+          <!-- Notes Controls Toolbar -->
+          <div class="doc-notes-toolbar">
+            <div class="notes-depth-wrap">
+              <label for="docNotesDepth" class="toolbar-label">Detail Level:</label>
+              <select id="docNotesDepth" class="form-select doc-select-sm">
+                <option value="short">Short (~300w High-Yield Summary)</option>
+                <option value="medium" selected>Medium (~750w Academic Standard)</option>
+                <option value="detailed">Detailed (~1,400w Comprehensive Breakdown)</option>
+              </select>
+            </div>
+
+            <div class="notes-actions-group">
+              <button type="button" class="btn-toolbar btn-primary-sm" id="docGenerateNotesBtn">
+                <span class="btn-icon">⚡</span>
+                <span id="docGenerateNotesText">Generate Notes</span>
+              </button>
+              <button type="button" class="btn-toolbar" id="docCopyNotesBtn" title="Copy Notes to Clipboard">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Copy</span>
+              </button>
+              <button type="button" class="btn-toolbar" id="docDownloadNotesBtn" title="Download Notes as Markdown (.md)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Download .md</span>
+              </button>
+              <button type="button" class="btn-toolbar btn-outline-indigo" id="docExportNotesBtn" title="Send Notes into Active Chat Workspace">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                <span>Export to Chat</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Notes Body Container -->
+          <div class="doc-notes-body" id="docNotesBody">
+            <!-- Empty Placeholder -->
+            <div class="doc-empty-state" id="docNotesEmpty">
+              <div class="empty-icon">📝</div>
+              <h4>No Study Notes Generated Yet</h4>
+              <p>Upload a PDF, Word document, or text file, select your desired depth above, and click <strong>Generate Notes</strong>.</p>
+              <button type="button" class="btn-primary-sm" id="docEmptyUploadBtn">Go to Upload</button>
+            </div>
+
+            <!-- Loading Skeleton -->
+            <div class="doc-loading-state" id="docNotesLoading" hidden>
+              <div class="spinner-pulse"></div>
+              <p class="loading-status-text" id="docNotesLoadingText">Analyzing document structure and synthesizing 9-part notes...</p>
+              <span class="loading-sub">Powered by Gemini AI Engine</span>
+            </div>
+
+            <!-- Rendered 9-Section Notes Content -->
+            <div class="doc-notes-rendered markdown-content" id="docNotesRendered" hidden></div>
+          </div>
+
+        </div><!-- /paneDocNotes -->
+
+        <!-- ── PANE 3: CHAT WITH DOCUMENT ── -->
+        <div class="doc-pane" id="paneDocChat" role="tabpanel" aria-labelledby="tabDocChat" hidden>
+          
+          <!-- Subheader / Document Context Bar -->
+          <div class="doc-chat-subbar">
+            <div class="chat-doc-info">
+              <span class="chat-doc-pill" id="docChatDocPill">📄 No document active</span>
+              <span class="chat-doc-hint">AI answers cite sections from this document</span>
+            </div>
+            <button type="button" class="btn-secondary-sm" id="docChatClearBtn" title="Clear Document Q&A History">Clear Chat</button>
+          </div>
+
+          <!-- Suggested Prompt Chips -->
+          <div class="doc-chat-chips" id="docChatChips">
+            <button type="button" class="doc-chip" data-query="Explain this topic in simple words.">💡 Explain in simple words</button>
+            <button type="button" class="doc-chip" data-query="Summarize the core concepts and takeaways.">📋 Core takeaways</button>
+            <button type="button" class="doc-chip" data-query="What are the important revision and exam questions?">❓ Likely exam questions</button>
+            <button type="button" class="doc-chip" data-query="Explain the formulas and equations with examples.">📐 Formulas &amp; equations</button>
+            <button type="button" class="doc-chip" data-query="Compare the two most important concepts explained in this document.">⚖️ Compare concepts</button>
+          </div>
+
+          <!-- Chat Messages Area -->
+          <div class="doc-chat-messages" id="docChatMessages" role="log" aria-live="polite">
+            <div class="doc-chat-msg doc-chat-msg-ai">
+              <div class="doc-msg-avatar">🤖</div>
+              <div class="doc-msg-bubble">
+                <div class="doc-msg-source-tag">Source: Document Assistant</div>
+                <p>Hello! I am ready to answer your questions based on your uploaded document. Ask for simple explanations, formula breakdowns, chapter summaries, or likely exam questions.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Composer -->
+          <form class="doc-chat-composer" id="docChatForm">
+            <textarea
+              class="doc-chat-input"
+              id="docChatInput"
+              placeholder="Ask a question about this document… (Enter sends, Shift+Enter for newline)"
+              rows="2"
+              maxlength="2000"
+              aria-label="Ask a question about this document"
+            ></textarea>
+            <div class="doc-chat-composer-controls">
+              <span class="doc-input-count" id="docChatInputCount">0 / 2,000</span>
+              <button type="submit" class="btn-primary-sm doc-chat-send-btn" id="docChatSendBtn" disabled>
+                <span>Ask AI</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </form>
+
+        </div><!-- /paneDocChat -->
+
+        <!-- ── PANE 4: RAW EXTRACTED TEXT VIEWER ── -->
+        <div class="doc-pane" id="paneDocText" role="tabpanel" aria-labelledby="tabDocText" hidden>
+          <div class="doc-text-toolbar">
+            <div class="text-search-wrap">
+              <input type="search" id="docTextSearchInput" class="form-input text-search-input" placeholder="Search within extracted text…">
+            </div>
+            <div class="text-stats-wrap">
+              <span class="text-stat-item" id="docTextStats">0 words • 0 chars</span>
+              <button type="button" class="btn-toolbar" id="docCopyRawTextBtn" title="Copy Raw Text">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Copy Text</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="doc-raw-text-view" id="docRawTextView">
+            <pre class="doc-raw-pre" id="docRawPre">No document text available. Please upload a PDF, DOCX, or TXT document first.</pre>
+          </div>
+        </div><!-- /paneDocText -->
+
+      </div><!-- /doc-content-wrapper -->
+
+    </div><!-- /doc-studio-card -->
+  </div><!-- /docStudioModal -->
 
   <!-- ═══════════════════════════════════════════════════════
        5. FEATURE MODALS: Study Planner, Saved Items, Settings

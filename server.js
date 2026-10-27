@@ -49,9 +49,10 @@ const chatLimiter = rateLimit({
   },
 });
 
-// Apply rate limit to both chat and study tools API endpoints
+// Apply rate limit to chat, study tools, and document API endpoints
 app.use('/api/chat', chatLimiter);
 app.use('/api/tools', chatLimiter);
+app.use('/api/document', chatLimiter);
 
 // ── 5. Routes ─────────────────────────────────────────────────────────────────
 const indexRoutes = require('./routes/index');

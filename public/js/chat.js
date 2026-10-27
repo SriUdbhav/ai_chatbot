@@ -2013,6 +2013,10 @@ document.addEventListener('click', (e) => {
   const toolBtn = e.target.closest('[data-tool]');
   if (toolBtn) {
     const tool = toolBtn.dataset.tool;
+    if (tool === 'document') {
+      openDocStudio('upload');
+      return;
+    }
     if (tool) {
       openToolsModal(tool);
     }
@@ -2556,7 +2560,9 @@ function initQuickToolsBar() {
     if (!pill) return;
 
     const action = pill.dataset.quick;
-    if (action === 'explain') {
+    if (action === 'document') {
+      openDocStudio('upload');
+    } else if (action === 'explain') {
       messageInput.value = 'Explain the concept of ';
       messageInput.focus();
       autoResize();
@@ -2740,6 +2746,8 @@ function initStudyPanelAndModals() {
       const action = tile.dataset.action;
       if (action === 'explain-topic' || action === 'explain-dsa') {
         openToolsModal('explain');
+      } else if (action === 'upload-document') {
+        openDocStudio('upload');
       } else if (action === 'generate-notes') {
         openToolsModal('summarize');
       } else if (action === 'solve-problem' || action === 'debug-code') {
@@ -2790,7 +2798,7 @@ function initStudyPanelAndModals() {
   if (navSubjectNotes) {
     navSubjectNotes.addEventListener('click', () => {
       closeSidebar();
-      openToolsModal('summarize');
+      openDocStudio('notes');
     });
   }
 
@@ -2983,10 +2991,816 @@ function initTopbarFeatures() {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   DOCUMENT STUDIO — AI Document Reader, 9-Part Notes & Q&A
+───────────────────────────────────────────────────────────────── */
+const docState = {
+  file: null,
+  filename: '',
+  fileSize: 0,
+  fileType: '',
+  pageCount: 1,
+  wordCount: 0,
+  text: '',
+  notes: '',
+  notesDepth: 'medium',
+  chatHistory: [],
+  isUploading: false,
+  isGeneratingNotes: false,
+  isChatting: false
+};
+
+function formatBytes(bytes, decimals = 1) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+function openDocStudio(initialTab = 'upload') {
+  const docStudioModal = document.getElementById('docStudioModal');
+  if (!docStudioModal) return;
+
+  docStudioModal.removeAttribute('hidden');
+  switchDocTab(initialTab);
+
+  if (docState.text) {
+    updateDocUI();
+  }
+}
+
+function closeDocStudio() {
+  const docStudioModal = document.getElementById('docStudioModal');
+  if (docStudioModal) {
+    docStudioModal.setAttribute('hidden', '');
+  }
+}
+
+function switchDocTab(tabName) {
+  const docTabs = document.querySelectorAll('.doc-tab');
+  const docPanes = document.querySelectorAll('.doc-pane');
+
+  docTabs.forEach(tab => {
+    const isActive = tab.dataset.tab === tabName;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+
+  docPanes.forEach(pane => {
+    const paneName = pane.id.replace('paneDoc', '').toLowerCase();
+    if (paneName === tabName.toLowerCase()) {
+      pane.removeAttribute('hidden');
+      pane.classList.add('active');
+    } else {
+      pane.setAttribute('hidden', '');
+      pane.classList.remove('active');
+    }
+  });
+
+  if (tabName === 'chat') {
+    const chatMsgs = document.getElementById('docChatMessages');
+    if (chatMsgs) chatMsgs.scrollTop = chatMsgs.scrollHeight;
+    const input = document.getElementById('docChatInput');
+    if (input) setTimeout(() => input.focus(), 100);
+  }
+
+  if (tabName === 'text') {
+    const pre = document.getElementById('docRawPre');
+    if (pre && docState.text) {
+      pre.textContent = docState.text;
+    }
+  }
+}
+
+function showDocError(title, message) {
+  const errorBanner = document.getElementById('docErrorBanner');
+  const errorTitle = document.getElementById('docErrorTitle');
+  const errorMsg = document.getElementById('docErrorMessage');
+  if (errorBanner && errorTitle && errorMsg) {
+    errorTitle.textContent = title;
+    errorMsg.innerHTML = message;
+    errorBanner.removeAttribute('hidden');
+  }
+}
+
+function clearDocError() {
+  const errorBanner = document.getElementById('docErrorBanner');
+  if (errorBanner) {
+    errorBanner.setAttribute('hidden', '');
+  }
+}
+
+function updateDocUI() {
+  const docDropzone = document.getElementById('docDropzone');
+  const docMetaCard = document.getElementById('docMetaCard');
+  const docMetaFilename = document.getElementById('docMetaFilename');
+  const docMetaType = document.getElementById('docMetaType');
+  const docMetaSize = document.getElementById('docMetaSize');
+  const docMetaPages = document.getElementById('docMetaPages');
+  const docMetaWords = document.getElementById('docMetaWords');
+  const docTypeIcon = document.getElementById('docTypeIcon');
+  const docStatusBadge = document.getElementById('docStatusBadge');
+  const docChatDocPill = document.getElementById('docChatDocPill');
+  const docRawPre = document.getElementById('docRawPre');
+  const docTextStats = document.getElementById('docTextStats');
+
+  if (docState.text) {
+    if (docDropzone) docDropzone.style.display = 'none';
+    if (docMetaCard) docMetaCard.removeAttribute('hidden');
+
+    if (docMetaFilename) docMetaFilename.textContent = docState.filename;
+    if (docMetaType) docMetaType.textContent = docState.fileType.toUpperCase();
+    if (docMetaSize) docMetaSize.textContent = formatBytes(docState.fileSize);
+    if (docMetaPages) docMetaPages.textContent = `${docState.pageCount} ${docState.pageCount === 1 ? 'Page' : 'Pages'}`;
+    if (docMetaWords) docMetaWords.textContent = `${docState.wordCount.toLocaleString()} Words`;
+
+    const icons = { pdf: '📕', docx: '📘', txt: '📄' };
+    if (docTypeIcon) docTypeIcon.textContent = icons[docState.fileType] || '📄';
+
+    if (docStatusBadge) {
+      docStatusBadge.textContent = `📄 ${docState.filename}`;
+      docStatusBadge.classList.add('has-doc');
+    }
+
+    if (docChatDocPill) {
+      docChatDocPill.textContent = `📄 ${docState.filename} (${docState.pageCount}p)`;
+    }
+
+    if (docRawPre) docRawPre.textContent = docState.text;
+    if (docTextStats) {
+      docTextStats.textContent = `${docState.wordCount.toLocaleString()} words • ${docState.text.length.toLocaleString()} characters`;
+    }
+  } else {
+    if (docDropzone) docDropzone.style.display = 'flex';
+    if (docMetaCard) docMetaCard.setAttribute('hidden', '');
+    if (docStatusBadge) {
+      docStatusBadge.textContent = 'No document';
+      docStatusBadge.classList.remove('has-doc');
+    }
+    if (docChatDocPill) {
+      docChatDocPill.textContent = '📄 No document active';
+    }
+    if (docRawPre) {
+      docRawPre.textContent = 'No document text available. Please upload a PDF, DOCX, or TXT document first.';
+    }
+    if (docTextStats) {
+      docTextStats.textContent = '0 words • 0 chars';
+    }
+  }
+}
+
+async function handleFileUpload(file) {
+  if (!file) return;
+
+  clearDocError();
+
+  const MAX_BYTES = 10 * 1024 * 1024;
+  if (file.size > MAX_BYTES) {
+    showDocError(
+      'File Too Large',
+      `The selected file is <strong>${formatBytes(file.size)}</strong>, which exceeds the 10 MB maximum limit. Please select a smaller document.`
+    );
+    return;
+  }
+
+  const name = file.name.toLowerCase();
+  const isValidExt = name.endsWith('.pdf') || name.endsWith('.docx') || name.endsWith('.txt');
+  if (!isValidExt) {
+    showDocError(
+      'Unsupported File Format',
+      'Please upload a <strong>PDF (.pdf)</strong>, <strong>Word (.docx)</strong>, or <strong>Plain Text (.txt)</strong> document.'
+    );
+    return;
+  }
+
+  const progressWrap = document.getElementById('docProgressWrap');
+  const progressFill = document.getElementById('docProgressFill');
+  const progressPercent = document.getElementById('docProgressPercent');
+  const progressText = document.getElementById('docProgressText');
+
+  if (progressWrap) progressWrap.removeAttribute('hidden');
+  if (progressFill) progressFill.style.width = '25%';
+  if (progressPercent) progressPercent.textContent = '25%';
+  if (progressText) progressText.textContent = `Uploading ${file.name}...`;
+
+  docState.isUploading = true;
+
+  try {
+    const formData = new FormData();
+    formData.append('document', file);
+
+    if (progressFill) progressFill.style.width = '65%';
+    if (progressPercent) progressPercent.textContent = '65%';
+    if (progressText) progressText.textContent = 'Extracting and reading document text...';
+
+    const res = await fetch('/api/document/read', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (progressFill) progressFill.style.width = '100%';
+    if (progressPercent) progressPercent.textContent = '100%';
+
+    setTimeout(() => {
+      if (progressWrap) progressWrap.setAttribute('hidden', '');
+    }, 400);
+
+    if (!res.ok || data.status !== 'success') {
+      if (data.code === 'SCANNED_PDF_NO_TEXT') {
+        showDocError(
+          'Scanned / Image-Only PDF Detected',
+          'This PDF does not contain selectable digital text. It appears to be scanned pages or images.<br><br>' +
+          '<strong>OCR Required:</strong> StudyMate AI requires selectable text. Please use an OCR tool (e.g. Adobe Acrobat OCR, Google Drive, or an online OCR converter) to convert scanned pages to readable text first.'
+        );
+      } else {
+        showDocError(
+          data.code === 'EMPTY_DOCUMENT' ? 'Empty Document' : 'Reading Failed',
+          data.message || 'Could not parse document. Please ensure the file is not corrupted or password-protected.'
+        );
+      }
+      return;
+    }
+
+    docState.file = file;
+    docState.filename = data.filename;
+    docState.fileSize = data.fileSize;
+    docState.fileType = data.fileType;
+    docState.pageCount = data.pageCount;
+    docState.wordCount = data.wordCount;
+    docState.text = data.text;
+    docState.notes = '';
+    docState.chatHistory = [];
+
+    const notesRendered = document.getElementById('docNotesRendered');
+    const notesEmpty = document.getElementById('docNotesEmpty');
+    const notesLoading = document.getElementById('docNotesLoading');
+    const genNotesText = document.getElementById('docGenerateNotesText');
+    if (notesRendered) {
+      notesRendered.innerHTML = '';
+      notesRendered.setAttribute('hidden', '');
+    }
+    if (notesLoading) notesLoading.setAttribute('hidden', '');
+    if (notesEmpty) notesEmpty.removeAttribute('hidden');
+    if (genNotesText) genNotesText.textContent = 'Generate Notes';
+
+    const chatMsgs = document.getElementById('docChatMessages');
+    if (chatMsgs) {
+      chatMsgs.innerHTML = `
+        <div class="doc-chat-msg doc-chat-msg-ai">
+          <div class="doc-msg-avatar">🤖</div>
+          <div class="doc-msg-bubble">
+            <div class="doc-msg-source-tag">Source: Document Assistant</div>
+            <p>I have read <strong>${escapeHtml(data.filename)}</strong> (${data.pageCount} ${data.pageCount === 1 ? 'page' : 'pages'}, ${data.wordCount.toLocaleString()} words). Ask me any questions, or click <strong>Study Notes</strong> to generate structured revision sheets!</p>
+          </div>
+        </div>
+      `;
+    }
+
+    updateDocUI();
+    showToast(`✅ "${data.filename}" read successfully (${data.wordCount.toLocaleString()} words)!`, 'success');
+
+  } catch (err) {
+    if (progressWrap) progressWrap.setAttribute('hidden', '');
+    showDocError('Network Error', 'An unexpected error occurred while uploading. Please check your connection and try again.');
+    console.error('[DocumentStudio] Upload error:', err);
+  } finally {
+    docState.isUploading = false;
+  }
+}
+
+function removeDocument() {
+  docState.file = null;
+  docState.filename = '';
+  docState.fileSize = 0;
+  docState.fileType = '';
+  docState.pageCount = 1;
+  docState.wordCount = 0;
+  docState.text = '';
+  docState.notes = '';
+  docState.chatHistory = [];
+
+  const fileInput = document.getElementById('docFileInput');
+  if (fileInput) fileInput.value = '';
+
+  clearDocError();
+  updateDocUI();
+
+  const notesRendered = document.getElementById('docNotesRendered');
+  const notesEmpty = document.getElementById('docNotesEmpty');
+  const notesLoading = document.getElementById('docNotesLoading');
+  const genNotesText = document.getElementById('docGenerateNotesText');
+  if (notesRendered) {
+    notesRendered.innerHTML = '';
+    notesRendered.setAttribute('hidden', '');
+  }
+  if (notesLoading) notesLoading.setAttribute('hidden', '');
+  if (notesEmpty) notesEmpty.removeAttribute('hidden');
+  if (genNotesText) genNotesText.textContent = 'Generate Notes';
+
+  showToast('Document removed.', 'info');
+}
+
+async function generateDocNotes(force = false) {
+  if (!docState.text) {
+    showToast('Please upload a PDF, Word, or Text document first.', 'warning');
+    switchDocTab('upload');
+    return;
+  }
+
+  if (docState.notes && !force) {
+    switchDocTab('notes');
+    return;
+  }
+
+  switchDocTab('notes');
+
+  const notesEmpty = document.getElementById('docNotesEmpty');
+  const notesLoading = document.getElementById('docNotesLoading');
+  const notesRendered = document.getElementById('docNotesRendered');
+  const notesBtn = document.getElementById('docGenerateNotesBtn');
+  const notesDepth = document.getElementById('docNotesDepth');
+  const loadingText = document.getElementById('docNotesLoadingText');
+  const genNotesText = document.getElementById('docGenerateNotesText');
+
+  if (notesEmpty) notesEmpty.setAttribute('hidden', '');
+  if (notesRendered) notesRendered.setAttribute('hidden', '');
+  if (notesLoading) notesLoading.removeAttribute('hidden');
+  if (notesBtn) notesBtn.disabled = true;
+
+  const depth = notesDepth ? notesDepth.value : 'medium';
+  docState.notesDepth = depth;
+  docState.isGeneratingNotes = true;
+
+  const statusMessages = [
+    'Reading and parsing document contents...',
+    'Extracting core definitions and chapter structure...',
+    'Synthesizing 9-part academic revision notes...',
+    'Polishing revision sheet with Gemini AI...'
+  ];
+  let msgIdx = 0;
+  const timer = setInterval(() => {
+    msgIdx = (msgIdx + 1) % statusMessages.length;
+    if (loadingText) loadingText.textContent = statusMessages[msgIdx];
+  }, 2200);
+
+  try {
+    const res = await fetch('/api/document/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: docState.text,
+        filename: docState.filename,
+        depth: depth
+      })
+    });
+
+    clearInterval(timer);
+    const data = await res.json();
+
+    if (!res.ok || data.status !== 'success') {
+      if (notesLoading) notesLoading.setAttribute('hidden', '');
+      if (notesEmpty) notesEmpty.removeAttribute('hidden');
+      showToast(data.message || 'Failed to generate study notes.', 'error');
+      return;
+    }
+
+    docState.notes = data.notes;
+
+    if (notesLoading) notesLoading.setAttribute('hidden', '');
+    if (notesRendered) {
+      notesRendered.innerHTML = renderMarkdown(data.notes);
+      notesRendered.removeAttribute('hidden');
+    }
+    if (genNotesText) genNotesText.textContent = 'Regenerate Notes';
+    showToast('✅ 9-Part Study Notes generated successfully!', 'success');
+
+  } catch (err) {
+    clearInterval(timer);
+    if (notesLoading) notesLoading.setAttribute('hidden', '');
+    if (notesEmpty) notesEmpty.removeAttribute('hidden');
+    showToast('Failed to connect to AI summarizer. Please try again.', 'error');
+    console.error('[DocumentStudio] Summarize error:', err);
+  } finally {
+    if (notesBtn) notesBtn.disabled = false;
+    docState.isGeneratingNotes = false;
+  }
+}
+
+function copyDocNotes() {
+  if (!docState.notes) {
+    showToast('Generate study notes first before copying.', 'warning');
+    return;
+  }
+
+  navigator.clipboard.writeText(docState.notes).then(() => {
+    showToast('📋 9-Part Study Notes copied to clipboard!', 'success');
+  }).catch(() => {
+    showToast('Could not copy notes to clipboard.', 'error');
+  });
+}
+
+function downloadDocNotes() {
+  if (!docState.notes) {
+    showToast('Generate study notes first before downloading.', 'warning');
+    return;
+  }
+
+  const baseName = (docState.filename || 'Document').replace(/\.[^/.]+$/, '');
+  const fileName = `${baseName}_Study_Notes.md`;
+  const blob = new Blob([docState.notes], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`📥 Downloaded "${fileName}"!`, 'success');
+}
+
+function exportDocNotesToChat() {
+  if (!docState.notes) {
+    showToast('Generate study notes first before exporting to chat.', 'warning');
+    return;
+  }
+
+  const convTitle = `Notes: ${docState.filename || 'Document'}`;
+  const convId = ensureActiveConversation(convTitle);
+
+  const arrival = Date.now();
+  appendMessageToConv(convId, {
+    id: generateId('msg'),
+    role: 'model',
+    content: `### 📄 AI Study Notes for **${escapeHtml(docState.filename)}**\n\n${docState.notes}`,
+    timestamp: arrival,
+    time: formatTime(arrival),
+    isError: false
+  });
+
+  closeDocStudio();
+  messageInput.focus();
+  showToast('🚀 Notes exported to your active chat workspace!', 'success');
+}
+
+async function sendDocChatMessage(userQuery) {
+  const query = (userQuery || '').trim();
+  if (!query) return;
+
+  if (!docState.text) {
+    showToast('Please upload a document first before asking questions.', 'warning');
+    switchDocTab('upload');
+    return;
+  }
+
+  const chatMsgs = document.getElementById('docChatMessages');
+  const chatInput = document.getElementById('docChatInput');
+  const chatSendBtn = document.getElementById('docChatSendBtn');
+  const inputCount = document.getElementById('docChatInputCount');
+
+  const userMsgEl = document.createElement('div');
+  userMsgEl.className = 'doc-chat-msg doc-chat-msg-user';
+  userMsgEl.innerHTML = `
+    <div class="doc-msg-avatar">You</div>
+    <div class="doc-msg-bubble">
+      <p>${escapeHtml(query)}</p>
+    </div>
+  `;
+  if (chatMsgs) {
+    chatMsgs.appendChild(userMsgEl);
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  }
+
+  if (chatInput) chatInput.value = '';
+  if (inputCount) inputCount.textContent = '0 / 2,000';
+  if (chatSendBtn) chatSendBtn.disabled = true;
+
+  const aiMsgEl = document.createElement('div');
+  aiMsgEl.className = 'doc-chat-msg doc-chat-msg-ai';
+  aiMsgEl.innerHTML = `
+    <div class="doc-msg-avatar">🤖</div>
+    <div class="doc-msg-bubble">
+      <div class="doc-msg-source-tag">Searching document...</div>
+      <p style="opacity:0.75;">Retrieving relevant passages and formulating answer...</p>
+    </div>
+  `;
+  if (chatMsgs) {
+    chatMsgs.appendChild(aiMsgEl);
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  }
+
+  docState.isChatting = true;
+
+  try {
+    const historyPayload = (docState.chatHistory || []).slice(-8).map(m => ({
+      role: m.role === 'model' ? 'model' : 'user',
+      content: m.content
+    }));
+
+    const res = await fetch('/api/document/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: query,
+        history: historyPayload,
+        documentText: docState.text,
+        filename: docState.filename
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.status !== 'success') {
+      aiMsgEl.innerHTML = `
+        <div class="doc-msg-avatar" style="background:#ef4444;color:#fff;">⚠️</div>
+        <div class="doc-msg-bubble" style="border-color:#fca5a5;background:#fef2f2;color:#991b1b;">
+          <div class="doc-msg-source-tag" style="color:#991b1b;">Error</div>
+          <p>${escapeHtml(data.message || 'Failed to answer question. Please try again.')}</p>
+        </div>
+      `;
+      return;
+    }
+
+    docState.chatHistory.push({ role: 'user', content: query });
+    docState.chatHistory.push({ role: 'model', content: data.reply });
+
+    let sourceTag = `Citing ${escapeHtml(docState.filename)}`;
+    if (data.reply.includes('not covered in the uploaded document') || data.reply.includes('[General Supplemental Knowledge]')) {
+      sourceTag = 'General Knowledge / Document Notice';
+    }
+
+    aiMsgEl.innerHTML = `
+      <div class="doc-msg-avatar">🤖</div>
+      <div class="doc-msg-bubble">
+        <div class="doc-msg-source-tag">${sourceTag}</div>
+        <div class="markdown-content">${renderMarkdown(data.reply)}</div>
+      </div>
+    `;
+
+  } catch (err) {
+    aiMsgEl.innerHTML = `
+      <div class="doc-msg-avatar" style="background:#ef4444;color:#fff;">⚠️</div>
+      <div class="doc-msg-bubble" style="border-color:#fca5a5;background:#fef2f2;color:#991b1b;">
+        <div class="doc-msg-source-tag" style="color:#991b1b;">Network Error</div>
+        <p>Failed to connect to document assistant. Please try again.</p>
+      </div>
+    `;
+    console.error('[DocumentStudio] Q&A error:', err);
+  } finally {
+    docState.isChatting = false;
+    if (chatMsgs) chatMsgs.scrollTop = chatMsgs.scrollHeight;
+    if (chatInput) {
+      chatInput.focus();
+      if (chatSendBtn) chatSendBtn.disabled = chatInput.value.trim() === '';
+    }
+  }
+}
+
+function clearDocChat() {
+  docState.chatHistory = [];
+  const chatMsgs = document.getElementById('docChatMessages');
+  if (chatMsgs) {
+    chatMsgs.innerHTML = `
+      <div class="doc-chat-msg doc-chat-msg-ai">
+        <div class="doc-msg-avatar">🤖</div>
+        <div class="doc-msg-bubble">
+          <div class="doc-msg-source-tag">Source: Document Assistant</div>
+          <p>Chat history cleared. What would you like to explore in <strong>${escapeHtml(docState.filename || 'your document')}</strong>?</p>
+        </div>
+      </div>
+    `;
+  }
+  showToast('Document chat history cleared.', 'info');
+}
+
+function initDocumentStudio() {
+  const docStudioModal     = document.getElementById('docStudioModal');
+  const closeDocStudioBtn  = document.getElementById('closeDocStudioBtn');
+  const openDocStudioBtn   = document.getElementById('openDocStudioBtn');
+  const docTabs            = document.querySelectorAll('.doc-tab');
+  const docDropzone        = document.getElementById('docDropzone');
+  const docFileInput       = document.getElementById('docFileInput');
+  const docBrowseBtn       = document.getElementById('docBrowseBtn');
+  const docRemoveBtn       = document.getElementById('docRemoveBtn');
+  const docErrorDismissBtn = document.getElementById('docErrorDismissBtn');
+  const docQuickNotesBtn   = document.getElementById('docQuickNotesBtn');
+  const docQuickChatBtn    = document.getElementById('docQuickChatBtn');
+  const docQuickTextBtn    = document.getElementById('docQuickTextBtn');
+  const docEmptyUploadBtn  = document.getElementById('docEmptyUploadBtn');
+  const docGenerateNotesBtn= document.getElementById('docGenerateNotesBtn');
+  const docCopyNotesBtn    = document.getElementById('docCopyNotesBtn');
+  const docDownloadNotesBtn= document.getElementById('docDownloadNotesBtn');
+  const docExportNotesBtn  = document.getElementById('docExportNotesBtn');
+  const docChatForm        = document.getElementById('docChatForm');
+  const docChatInput       = document.getElementById('docChatInput');
+  const docChatInputCount  = document.getElementById('docChatInputCount');
+  const docChatSendBtn     = document.getElementById('docChatSendBtn');
+  const docChatClearBtn    = document.getElementById('docChatClearBtn');
+  const docChatChips       = document.getElementById('docChatChips');
+  const docTextSearchInput = document.getElementById('docTextSearchInput');
+  const docCopyRawTextBtn  = document.getElementById('docCopyRawTextBtn');
+
+  if (openDocStudioBtn) {
+    openDocStudioBtn.addEventListener('click', () => openDocStudio('upload'));
+  }
+
+  if (closeDocStudioBtn) {
+    closeDocStudioBtn.addEventListener('click', closeDocStudio);
+  }
+
+  if (docStudioModal) {
+    docStudioModal.addEventListener('click', (e) => {
+      if (e.target === docStudioModal) {
+        closeDocStudio();
+      }
+    });
+  }
+
+  docTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.dataset.tab;
+      if (tabName) switchDocTab(tabName);
+    });
+  });
+
+  if (docBrowseBtn && docFileInput) {
+    docBrowseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      docFileInput.click();
+    });
+  }
+
+  if (docDropzone && docFileInput) {
+    docDropzone.addEventListener('click', () => {
+      docFileInput.click();
+    });
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      docDropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        docDropzone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      docDropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        docDropzone.classList.remove('dragover');
+      });
+    });
+
+    docDropzone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        handleFileUpload(files[0]);
+      }
+    });
+  }
+
+  if (docFileInput) {
+    docFileInput.addEventListener('change', () => {
+      if (docFileInput.files && docFileInput.files.length > 0) {
+        handleFileUpload(docFileInput.files[0]);
+      }
+    });
+  }
+
+  if (docRemoveBtn) {
+    docRemoveBtn.addEventListener('click', removeDocument);
+  }
+
+  if (docErrorDismissBtn) {
+    docErrorDismissBtn.addEventListener('click', clearDocError);
+  }
+
+  if (docQuickNotesBtn) {
+    docQuickNotesBtn.addEventListener('click', () => {
+      switchDocTab('notes');
+      if (!docState.notes) generateDocNotes();
+    });
+  }
+
+  if (docQuickChatBtn) {
+    docQuickChatBtn.addEventListener('click', () => {
+      switchDocTab('chat');
+    });
+  }
+
+  if (docQuickTextBtn) {
+    docQuickTextBtn.addEventListener('click', () => {
+      switchDocTab('text');
+    });
+  }
+
+  if (docEmptyUploadBtn) {
+    docEmptyUploadBtn.addEventListener('click', () => {
+      switchDocTab('upload');
+    });
+  }
+
+  if (docGenerateNotesBtn) {
+    docGenerateNotesBtn.addEventListener('click', () => generateDocNotes(true));
+  }
+
+  if (docCopyNotesBtn) {
+    docCopyNotesBtn.addEventListener('click', copyDocNotes);
+  }
+
+  if (docDownloadNotesBtn) {
+    docDownloadNotesBtn.addEventListener('click', downloadDocNotes);
+  }
+
+  if (docExportNotesBtn) {
+    docExportNotesBtn.addEventListener('click', exportDocNotesToChat);
+  }
+
+  if (docChatInput) {
+    docChatInput.addEventListener('input', () => {
+      const len = docChatInput.value.length;
+      if (docChatInputCount) docChatInputCount.textContent = `${len.toLocaleString()} / 2,000`;
+      if (docChatSendBtn) docChatSendBtn.disabled = docChatInput.value.trim() === '';
+    });
+
+    docChatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (docChatInput.value.trim() && !docState.isChatting) {
+          sendDocChatMessage(docChatInput.value.trim());
+        }
+      }
+    });
+  }
+
+  if (docChatForm) {
+    docChatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (docChatInput && docChatInput.value.trim() && !docState.isChatting) {
+        sendDocChatMessage(docChatInput.value.trim());
+      }
+    });
+  }
+
+  if (docChatClearBtn) {
+    docChatClearBtn.addEventListener('click', clearDocChat);
+  }
+
+  if (docChatChips) {
+    docChatChips.addEventListener('click', (e) => {
+      const chip = e.target.closest('.doc-chip');
+      if (chip && chip.dataset.query) {
+        sendDocChatMessage(chip.dataset.query);
+      }
+    });
+  }
+
+  if (docTextSearchInput) {
+    docTextSearchInput.addEventListener('input', () => {
+      const q = docTextSearchInput.value.trim().toLowerCase();
+      const pre = document.getElementById('docRawPre');
+      if (!pre) return;
+
+      if (!q || !docState.text) {
+        pre.textContent = docState.text || 'No document text available.';
+        return;
+      }
+
+      const lines = docState.text.split('\n');
+      const matched = lines.filter(l => l.toLowerCase().includes(q));
+      if (matched.length > 0) {
+        pre.textContent = matched.join('\n');
+      } else {
+        pre.textContent = `No lines found matching "${docTextSearchInput.value}".`;
+      }
+    });
+  }
+
+  if (docCopyRawTextBtn) {
+    docCopyRawTextBtn.addEventListener('click', () => {
+      if (!docState.text) {
+        showToast('No document text to copy.', 'warning');
+        return;
+      }
+      navigator.clipboard.writeText(docState.text).then(() => {
+        showToast('📋 Raw document text copied to clipboard!', 'success');
+      });
+    });
+  }
+}
+
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (state.isStreaming) {
       state.stopStreamingRequested = true;
+    }
+    const docStudioModal = document.getElementById('docStudioModal');
+    if (docStudioModal && !docStudioModal.hasAttribute('hidden')) {
+      closeDocStudio();
     }
     if (notifDropdown && !notifDropdown.hasAttribute('hidden')) {
       notifDropdown.setAttribute('hidden', '');
@@ -3027,6 +3841,7 @@ window.addEventListener('keydown', (e) => {
   initVoiceInput();
   initTopbarFeatures();
   initStudyPanelAndModals();
+  initDocumentStudio();
   updateComposerButtons();
   updateStudyPanel();
 
