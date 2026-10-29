@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">StudyMate AI</string>
+    <string name="loading_text">Loading StudyMate AI…</string>
+    <string name="no_internet_title">No Internet Connection</string>
+    <string name="no_internet_desc">StudyMate AI requires an active internet connection to communicate with Google Gemini and access your study tools.</string>
+    <string name="retry_button">Retry Connection</string>
+    <string name="ssl_error_title">Security Warning</string>
+    <string name="ssl_error_desc">A secure SSL connection to the server could not be validated. For your privacy and security, loading was stopped.</string>
+    <string name="file_chooser_title">Select Document</string>
+    <string name="exit_prompt">Press back again to exit</string>
+</resources>
