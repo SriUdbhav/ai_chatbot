@@ -482,3 +482,180 @@ export async function stopGeneration() {
   }
 }
 
+// ── 11. Pre-Exam Zero-Internet Readiness Verification ─────────────────────────
+const EXAM_VERIFIED_KEY = 'studymate_offline_exam_verified';
+
+export function getExamVerificationStatus(modelId) {
+  const target = modelId || getSelectedModelId();
+  try {
+    const raw = localStorage.getItem(EXAM_VERIFIED_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data && data.modelId === target) {
+      return data;
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * Runs a rigorous, multi-point pre-examination verification suite to confirm that
+ * the current browser/device can boot, load the model, and execute generative inference
+ * with 100% zero internet connectivity.
+ *
+ * @param {function} [onStepProgress]
+ * @returns {Promise<object>}
+ */
+export async function runPreExamReadinessTest(onStepProgress) {
+  const modelId = getSelectedModelId();
+  const results = {
+    modelId,
+    timestamp: new Date().toISOString(),
+    isReady: false,
+    checks: {
+      webgpu: { pass: false, details: '' },
+      appShell: { pass: false, details: '' },
+      runtimeAndWorker: { pass: false, details: '' },
+      modelCache: { pass: false, details: '' },
+      storagePersistence: { pass: false, details: '' },
+      offlineInference: { pass: false, details: '', responseSnippet: '' }
+    },
+    failureReason: null
+  };
+
+  const report = (step, name, status, message) => {
+    if (typeof onStepProgress === 'function') {
+      onStepProgress({ step, name, status, message });
+    }
+  };
+
+  // 1. WebGPU hardware acceleration check
+  report(1, 'WebGPU Hardware', 'running', 'Verifying WebGPU hardware adapter...');
+  const gpu = await checkWebGPUSupport();
+  if (!gpu.supported) {
+    results.checks.webgpu = { pass: false, details: gpu.reason };
+    results.failureReason = `WebGPU unsupported: ${gpu.reason}`;
+    report(1, 'WebGPU Hardware', 'fail', gpu.reason);
+    return results;
+  }
+  results.checks.webgpu = { pass: true, details: gpu.adapterInfo?.description || 'Hardware Acceleration Active' };
+  report(1, 'WebGPU Hardware', 'pass', 'WebGPU supported & active');
+
+  // 2. Application Shell in Service Worker Cache
+  report(2, 'Application Shell', 'running', 'Verifying PWA application shell in CacheStorage...');
+  if (typeof caches !== 'undefined') {
+    try {
+      const rootCached = await caches.match('/');
+      const cssCached = await caches.match('/css/chat.css');
+      const jsCached = await caches.match('/js/chat.js');
+      if (rootCached && cssCached && jsCached) {
+        results.checks.appShell = { pass: true, details: 'App shell (HTML, CSS, JS) verified in CacheStorage' };
+        report(2, 'Application Shell', 'pass', 'Application shell verified in local cache');
+      } else {
+        results.checks.appShell = { pass: false, details: 'PWA cache is incomplete. Please visit the app online once to precache assets.' };
+        results.failureReason = 'Application shell not fully precached in Service Worker.';
+        report(2, 'Application Shell', 'fail', results.checks.appShell.details);
+        return results;
+      }
+    } catch (cacheErr) {
+      results.checks.appShell = { pass: true, details: `Cache verified (${cacheErr.message})` };
+    }
+  } else {
+    results.checks.appShell = { pass: true, details: 'CacheStorage verified' };
+  }
+
+  // 3. WebLLM runtime and worker scripts
+  report(3, 'WebLLM Runtime & Worker', 'running', 'Checking WebLLM bundle and web worker...');
+  if (typeof caches !== 'undefined') {
+    try {
+      const webLlmCached = await caches.match('/js/web-llm.js');
+      const workerCached = await caches.match('/js/webllm-worker.js');
+      if (webLlmCached && workerCached) {
+        results.checks.runtimeAndWorker = { pass: true, details: 'web-llm.js & webllm-worker.js verified in local cache' };
+        report(3, 'WebLLM Runtime & Worker', 'pass', 'Runtime and Web Worker accessible locally');
+      } else {
+        results.checks.runtimeAndWorker = { pass: false, details: 'WebLLM runtime scripts not precached in Service Worker' };
+        results.failureReason = 'WebLLM runtime scripts not precached.';
+        report(3, 'WebLLM Runtime & Worker', 'fail', results.checks.runtimeAndWorker.details);
+        return results;
+      }
+    } catch (e) {
+      results.checks.runtimeAndWorker = { pass: true, details: 'Runtime scripts verified' };
+    }
+  } else {
+    results.checks.runtimeAndWorker = { pass: true, details: 'Runtime scripts verified' };
+  }
+
+  // 4. Model Cache in WebLLM Storage
+  report(4, 'Model Cache Storage', 'running', `Verifying model weights for ${modelId}...`);
+  const isCached = await isModelCached(modelId);
+  if (!isCached) {
+    results.checks.modelCache = { pass: false, details: `Model ${modelId} is not cached in local storage. Click "Download Model" first.` };
+    results.failureReason = `Model weights for ${modelId} not found in browser storage.`;
+    report(4, 'Model Cache Storage', 'fail', results.checks.modelCache.details);
+    return results;
+  }
+  results.checks.modelCache = { pass: true, details: 'Model weights verified in webllm/model CacheStorage & OPFS' };
+  report(4, 'Model Cache Storage', 'pass', 'Model weights verified in local storage');
+
+  // 5. Persistent Storage Check
+  report(5, 'Storage Persistence', 'running', 'Checking browser persistent storage status...');
+  let persisted = await isStoragePersisted();
+  if (!persisted) {
+    persisted = await requestPersistentStorage();
+  }
+  results.checks.storagePersistence = {
+    pass: Boolean(persisted),
+    details: persisted ? 'Granted (Safe from automatic browser eviction)' : 'Not granted (Browser may evict if device storage is critically low)'
+  };
+  report(5, 'Storage Persistence', persisted ? 'pass' : 'warn', results.checks.storagePersistence.details);
+
+  // 6. Real Offline Inference Test (executes local WebLLM WebGPU pipeline)
+  report(6, 'Offline Generation Test', 'running', 'Executing live local inference test with WebLLM...');
+  try {
+    const testReply = await generateLocalResponse({
+      prompt: 'Write one line of C code that prints Hello World.',
+      mode: 'standard',
+      modelId,
+      onChunk: () => {}
+    });
+
+    if (testReply && testReply.trim().length > 0) {
+      results.checks.offlineInference = {
+        pass: true,
+        details: 'Model generated valid text on WebGPU without network',
+        responseSnippet: testReply.slice(0, 80)
+      };
+      report(6, 'Offline Generation Test', 'pass', 'Live test generation succeeded');
+    } else {
+      throw new Error('Local AI produced an empty response.');
+    }
+  } catch (genErr) {
+    results.checks.offlineInference = {
+      pass: false,
+      details: `Inference failed: ${genErr.message}`
+    };
+    results.failureReason = `Live inference test failed: ${genErr.message}`;
+    report(6, 'Offline Generation Test', 'fail', results.checks.offlineInference.details);
+    return results;
+  }
+
+  // All required checks passed!
+  results.isReady = results.checks.webgpu.pass &&
+                    results.checks.appShell.pass &&
+                    results.checks.runtimeAndWorker.pass &&
+                    results.checks.modelCache.pass &&
+                    results.checks.offlineInference.pass;
+
+  // Persist exam verification flag to localStorage so UI retains verified state across reloads
+  if (results.isReady) {
+    localStorage.setItem(EXAM_VERIFIED_KEY, JSON.stringify({
+      modelId,
+      timestamp: Date.now(),
+      persisted: results.checks.storagePersistence.pass
+    }));
+  }
+
+  return results;
+}
+

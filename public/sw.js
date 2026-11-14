@@ -164,19 +164,19 @@ self.addEventListener('fetch', (event) => {
         } catch (networkErr) {
           // Device is offline:
           // 1. Try exact requested URL in cache
-          const cachedExact = await caches.match(request);
+          const cachedExact = await caches.match(request, { ignoreSearch: true });
           if (cachedExact) {
             return cachedExact;
           }
 
           // 2. Try the primary application root ('/')
-          const cachedRoot = await caches.match('/');
+          const cachedRoot = await caches.match('/', { ignoreSearch: true });
           if (cachedRoot) {
             return cachedRoot;
           }
 
           // 3. Fall back to the designated offline page
-          const offlinePage = await caches.match('/offline.html');
+          const offlinePage = await caches.match('/offline.html', { ignoreSearch: true });
           if (offlinePage) {
             return offlinePage;
           }

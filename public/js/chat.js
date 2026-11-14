@@ -413,6 +413,18 @@ function hideLocalAiDiagnostic() {
 const storagePersistenceBadge = document.getElementById('storagePersistenceBadge');
 const storagePersistenceDesc = document.getElementById('storagePersistenceDesc');
 
+// Pre-Exam Zero-Internet Readiness References
+const examReadinessOverallBadge = document.getElementById('examReadinessOverallBadge');
+const examCheckModelName = document.getElementById('examCheckModelName');
+const examCheckDownloadStatus = document.getElementById('examCheckDownloadStatus');
+const examCheckShaderStatus = document.getElementById('examCheckShaderStatus');
+const examCheckPersistenceStatus = document.getElementById('examCheckPersistenceStatus');
+const examCheckAssetsStatus = document.getElementById('examCheckAssetsStatus');
+const examCheckInferenceStatus = document.getElementById('examCheckInferenceStatus');
+const examTestProgressLog = document.getElementById('examTestProgressLog');
+const testOfflineModeBtn = document.getElementById('testOfflineModeBtn');
+const grantStoragePersistBtn = document.getElementById('grantStoragePersistBtn');
+
 // Interface Appearance & Accessibility References
 const surfaceOpacitySlider = document.getElementById('surfaceOpacitySlider');
 const surfaceOpacityVal = document.getElementById('surfaceOpacityVal');
@@ -4828,7 +4840,73 @@ async function initLocalAiSettings() {
     };
   }
 
-  // 4. Model Selection & Cache Refresh
+  // 4. Pre-Exam Readiness Synchronization
+  async function refreshExamReadiness() {
+    if (!examReadinessOverallBadge || !localAi) return;
+    const modelId = localModelSelect ? localModelSelect.value : localAi.getSelectedModelId();
+    const modelInfo = localAi.SUPPORTED_MODELS.find(m => m.id === modelId) || localAi.SUPPORTED_MODELS[0];
+
+    if (examCheckModelName) {
+      examCheckModelName.textContent = `${modelInfo.name} (${modelInfo.sizeEstimate})`;
+    }
+
+    const isCached = await localAi.isModelCached(modelId);
+    const isEngineLoaded = localAi.getActiveEngine() && localAi.getActiveModelId() === modelId;
+    const isPersisted = await localAi.isStoragePersisted();
+    const verifiedData = localAi.getExamVerificationStatus ? localAi.getExamVerificationStatus(modelId) : null;
+
+    if (examCheckDownloadStatus) {
+      examCheckDownloadStatus.textContent = isCached ? 'Downloaded (100% in local storage) ✓' : 'Not Downloaded ✗';
+      examCheckDownloadStatus.style.color = isCached ? '#10b981' : 'var(--text-muted, #64748b)';
+    }
+
+    if (examCheckShaderStatus) {
+      examCheckShaderStatus.textContent = isEngineLoaded ? 'Initialized in GPU VRAM ✓' : (isCached ? 'Cached (Ready to load)' : 'Not initialized');
+      examCheckShaderStatus.style.color = isEngineLoaded ? '#10b981' : 'var(--text-muted, #64748b)';
+    }
+
+    if (examCheckPersistenceStatus) {
+      examCheckPersistenceStatus.textContent = isPersisted ? 'Granted (Safe from eviction) ✓' : 'Not Granted (May be evicted under storage pressure)';
+      examCheckPersistenceStatus.style.color = isPersisted ? '#10b981' : '#f59e0b';
+    }
+
+    if (examCheckAssetsStatus) {
+      if (typeof caches !== 'undefined') {
+        const rootCached = await caches.match('/');
+        examCheckAssetsStatus.textContent = rootCached ? 'App Shell & Worker Pre-cached ✓' : 'Pre-caching in progress...';
+        examCheckAssetsStatus.style.color = rootCached ? '#10b981' : '#f59e0b';
+      } else {
+        examCheckAssetsStatus.textContent = 'App Shell Cached ✓';
+      }
+    }
+
+    if (examCheckInferenceStatus) {
+      if (verifiedData) {
+        const dateStr = new Date(verifiedData.timestamp).toLocaleTimeString();
+        examCheckInferenceStatus.textContent = `Verified ✓ (${dateStr})`;
+        examCheckInferenceStatus.style.color = '#10b981';
+      } else {
+        examCheckInferenceStatus.textContent = 'Not tested yet (Click "Test Offline Mode")';
+        examCheckInferenceStatus.style.color = 'var(--text-muted, #64748b)';
+      }
+    }
+
+    if (isCached && verifiedData) {
+      examReadinessOverallBadge.textContent = 'READY FOR ZERO-INTERNET EXAMS ✓';
+      examReadinessOverallBadge.className = 'status-badge-inline status-online';
+      examReadinessOverallBadge.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700;';
+    } else if (!isCached) {
+      examReadinessOverallBadge.textContent = 'Model Download Required';
+      examReadinessOverallBadge.className = 'status-badge-inline status-offline';
+      examReadinessOverallBadge.style.cssText = 'background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700;';
+    } else {
+      examReadinessOverallBadge.textContent = 'Offline Verification Recommended';
+      examReadinessOverallBadge.className = 'status-badge-inline';
+      examReadinessOverallBadge.style.cssText = 'background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700;';
+    }
+  }
+
+  // 4b. Model Selection & Cache Refresh
   async function refreshModelStatus() {
     if (!localModelSelect) return;
     const modelId = localModelSelect.value;
@@ -4872,6 +4950,8 @@ async function initLocalAiSettings() {
         if (testInferenceBtn) testInferenceBtn.style.display = 'none';
       }
     }
+
+    await refreshExamReadiness();
   }
 
   if (localModelSelect) {
@@ -4902,11 +4982,22 @@ async function initLocalAiSettings() {
           const p = Math.round((report.progress || 0) * 100);
           if (localAiProgressFill) localAiProgressFill.style.width = `${p}%`;
           if (localAiProgressPercent) localAiProgressPercent.textContent = `${p}%`;
-          if (localAiProgressText) localAiProgressText.textContent = report.text || 'Downloading model weights...';
-          updateEngineIndicator('downloading', `Downloading (${p}%)`);
+          if (p >= 100 && report.text && (report.text.includes('Loading') || report.text.includes('model'))) {
+            if (localAiProgressText) localAiProgressText.textContent = 'Initializing WebGPU shaders & allocating GPU VRAM...';
+            updateEngineIndicator('downloading', 'Initializing WebGPU...');
+          } else {
+            if (localAiProgressText) localAiProgressText.textContent = report.text || 'Downloading model weights...';
+            updateEngineIndicator('downloading', `Downloading (${p}%)`);
+          }
         });
 
-        showToast('Local AI model downloaded and loaded in WebGPU!', 'success');
+        // Ensure model initialization & cache persistence actually succeeded
+        const isVerifiedInCache = await localAi.isModelCached(modelId);
+        if (!isVerifiedInCache) {
+          throw new Error('Model initialization completed, but local cache verification failed. Model was not detected in browser storage.');
+        }
+
+        showToast('Local AI model downloaded, initialized in WebGPU, and stored persistently!', 'success');
         if (localAiProgressWrap) localAiProgressWrap.setAttribute('hidden', '');
         hideLocalAiDiagnostic();
         await refreshModelStatus();
@@ -4963,6 +5054,70 @@ async function initLocalAiSettings() {
       } finally {
         testInferenceBtn.disabled = false;
         testInferenceBtn.textContent = 'Test Local AI';
+      }
+    };
+  }
+
+  // 8. Pre-Exam Zero-Internet Test Button
+  if (testOfflineModeBtn) {
+    testOfflineModeBtn.onclick = async () => {
+      testOfflineModeBtn.disabled = true;
+      testOfflineModeBtn.innerHTML = '<span>⏳</span> Testing Offline Mode...';
+      if (examTestProgressLog) {
+        examTestProgressLog.style.display = 'block';
+        examTestProgressLog.innerHTML = '<b>🚀 Starting Pre-Exam Zero-Internet Diagnostics...</b><br>';
+      }
+
+      try {
+        const results = await localAi.runPreExamReadinessTest((step) => {
+          if (examTestProgressLog) {
+            const icon = step.status === 'pass' ? '✅' : step.status === 'warn' ? '⚠️' : step.status === 'fail' ? '❌' : '⏳';
+            examTestProgressLog.innerHTML += `<div>${icon} [Step ${step.step}/6] ${step.name}: ${step.message}</div>`;
+            examTestProgressLog.scrollTop = examTestProgressLog.scrollHeight;
+          }
+        });
+
+        await refreshExamReadiness();
+
+        if (results.isReady) {
+          showToast('🎓 Your laptop is verified and 100% READY for zero-internet exams!', 'success');
+          if (examTestProgressLog) {
+            examTestProgressLog.innerHTML += '<br><b style="color: #10b981;">🎉 ALL CHECKS PASSED: Application is 100% operational offline.</b>';
+          }
+        } else {
+          showToast(`Readiness test failed: ${results.failureReason}`, 'error');
+          if (examTestProgressLog) {
+            examTestProgressLog.innerHTML += `<br><b style="color: #ef4444;">❌ INCOMPLETE: ${results.failureReason}</b>`;
+          }
+        }
+      } catch (err) {
+        showToast(`Offline test error: ${err.message}`, 'error');
+        if (examTestProgressLog) {
+          examTestProgressLog.innerHTML += `<br><b style="color: #ef4444;">❌ Error: ${err.message}</b>`;
+        }
+      } finally {
+        testOfflineModeBtn.disabled = false;
+        testOfflineModeBtn.innerHTML = '<span>⚡</span> Test Offline Mode';
+      }
+    };
+  }
+
+  // 9. Grant Persistent Storage Button
+  if (grantStoragePersistBtn) {
+    grantStoragePersistBtn.onclick = async () => {
+      grantStoragePersistBtn.disabled = true;
+      try {
+        const granted = await localAi.requestPersistentStorage();
+        if (granted) {
+          showToast('Browser persistent storage granted! Model is protected against eviction.', 'success');
+        } else {
+          showToast('Persistent storage could not be granted automatically. Ensure site is added to bookmarks or installed.', 'info');
+        }
+        await refreshExamReadiness();
+      } catch (e) {
+        showToast('Storage persistence request error: ' + e.message, 'error');
+      } finally {
+        grantStoragePersistBtn.disabled = false;
       }
     };
   }

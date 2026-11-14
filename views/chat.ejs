@@ -1653,6 +1653,66 @@
             <span class="status-badge-inline status-online" id="storagePersistenceBadge">Checking...</span>
           </div>
 
+          <!-- Pre-Exam Zero-Internet Readiness Checker -->
+          <div class="setting-item pre-exam-readiness-item" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <span class="setting-name" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.95rem;">
+                  <span>📋</span> Pre-Exam Offline Readiness Checker
+                </span>
+                <span class="setting-desc">Verify that this device is 100% prepared for zero-internet examination use.</span>
+              </div>
+              <span class="status-badge-inline" id="examReadinessOverallBadge" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3);">Check Pending</span>
+            </div>
+
+            <!-- Readiness Checklist Cards -->
+            <div class="exam-checklist-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.5rem; font-size: 0.8rem;">
+              <div class="exam-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; margin-bottom: 2px;">1. Model Name &amp; Size</div>
+                <div id="examCheckModelName" style="color: var(--text-muted, #64748b);">Qwen2.5-Coder 1.5B (~980 MB)</div>
+              </div>
+
+              <div class="exam-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; margin-bottom: 2px;">2. Model Download Status</div>
+                <div id="examCheckDownloadStatus" style="color: var(--text-muted, #64748b);">Checking cache...</div>
+              </div>
+
+              <div class="exam-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; margin-bottom: 2px;">3. WebGPU Shader Init</div>
+                <div id="examCheckShaderStatus" style="color: var(--text-muted, #64748b);">Not initialized</div>
+              </div>
+
+              <div class="exam-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; margin-bottom: 2px;">4. Persistent Storage</div>
+                <div id="examCheckPersistenceStatus" style="color: var(--text-muted, #64748b);">Checking...</div>
+              </div>
+
+              <div class="exam-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; margin-bottom: 2px;">5. App Shell &amp; Worker</div>
+                <div id="examCheckAssetsStatus" style="color: var(--text-muted, #64748b);">Checking...</div>
+              </div>
+
+              <div class="exam-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; margin-bottom: 2px;">6. Offline Generation Test</div>
+                <div id="examCheckInferenceStatus" style="color: var(--text-muted, #64748b);">Not tested yet</div>
+              </div>
+            </div>
+
+            <!-- Diagnostics log / Test output -->
+            <div id="examTestProgressLog" style="display: none; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-family: var(--font-mono, monospace); background: rgba(0,0,0,0.1); border: 1px solid var(--border-subtle, rgba(0,0,0,0.1)); line-height: 1.4; max-height: 120px; overflow-y: auto;">
+            </div>
+
+            <!-- Pre-Exam Actions -->
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
+              <button type="button" class="btn-primary-sm" id="testOfflineModeBtn">
+                <span>⚡</span> Test Offline Mode
+              </button>
+              <button type="button" class="btn-secondary-sm" id="grantStoragePersistBtn">
+                <span>🛡️</span> Grant Persistent Storage
+              </button>
+            </div>
+          </div>
+
           <!-- Offline Image Generation Architecture (Part 6) -->
           <div class="setting-item">
             <div class="setting-info">
