@@ -384,6 +384,32 @@ const localAiProgressText = document.getElementById('localAiProgressText');
 const downloadModelBtn = document.getElementById('downloadModelBtn');
 const deleteModelBtn = document.getElementById('deleteModelBtn');
 const testInferenceBtn = document.getElementById('testInferenceBtn');
+const localAiDiagnosticBox = document.getElementById('localAiDiagnosticBox');
+const localAiDiagnosticBadge = document.getElementById('localAiDiagnosticBadge');
+const localAiDiagnosticTitle = document.getElementById('localAiDiagnosticTitle');
+const localAiDiagnosticMessage = document.getElementById('localAiDiagnosticMessage');
+const localAiDiagnosticDetails = document.getElementById('localAiDiagnosticDetails');
+
+function showLocalAiDiagnostic(diag) {
+  if (!localAiDiagnosticBox) return;
+  localAiDiagnosticBox.style.display = 'block';
+  if (localAiDiagnosticBadge) localAiDiagnosticBadge.textContent = diag.category || 'Error';
+  if (localAiDiagnosticTitle) localAiDiagnosticTitle.textContent = diag.title || 'Diagnostic Error';
+  if (localAiDiagnosticMessage) localAiDiagnosticMessage.textContent = diag.message || 'An error occurred during local AI operation.';
+  if (localAiDiagnosticDetails) {
+    if (diag.details && diag.details !== diag.message) {
+      localAiDiagnosticDetails.textContent = diag.details;
+      localAiDiagnosticDetails.style.display = 'block';
+    } else {
+      localAiDiagnosticDetails.style.display = 'none';
+    }
+  }
+}
+
+function hideLocalAiDiagnostic() {
+  if (localAiDiagnosticBox) localAiDiagnosticBox.style.display = 'none';
+}
+
 const storagePersistenceBadge = document.getElementById('storagePersistenceBadge');
 const storagePersistenceDesc = document.getElementById('storagePersistenceDesc');
 
@@ -4817,6 +4843,7 @@ async function initLocalAiSettings() {
 
     if (modelCacheBadge && modelCacheStatusDesc && downloadModelBtn && deleteModelBtn) {
       if (isEngineLoaded) {
+        hideLocalAiDiagnostic();
         modelCacheBadge.textContent = 'Ready in WebGPU ✓';
         modelCacheBadge.className = 'status-badge-inline status-online';
         modelCacheStatusDesc.textContent = 'Model loaded in GPU VRAM and ready for instant offline inference.';
@@ -4825,6 +4852,7 @@ async function initLocalAiSettings() {
         deleteModelBtn.style.display = 'inline-block';
         if (testInferenceBtn) testInferenceBtn.style.display = 'inline-block';
       } else if (isCached) {
+        hideLocalAiDiagnostic();
         modelCacheBadge.textContent = 'Cached Locally ✓';
         modelCacheBadge.className = 'status-badge-inline status-online';
         modelCacheStatusDesc.textContent = 'Model weights cached in browser storage. Ready for offline inference.';
@@ -4836,7 +4864,9 @@ async function initLocalAiSettings() {
         modelCacheBadge.textContent = 'Not Downloaded';
         modelCacheBadge.className = 'status-badge-inline status-offline';
         modelCacheStatusDesc.textContent = 'Model weights not yet cached. Click Download Model while online.';
-        downloadModelBtn.textContent = 'Download Model';
+        if (downloadModelBtn.textContent !== 'Retry Download') {
+          downloadModelBtn.textContent = 'Download Model';
+        }
         downloadModelBtn.disabled = false;
         deleteModelBtn.style.display = 'none';
         if (testInferenceBtn) testInferenceBtn.style.display = 'none';
@@ -4848,6 +4878,7 @@ async function initLocalAiSettings() {
     localModelSelect.value = localAi.getSelectedModelId();
     localModelSelect.onchange = async () => {
       localAi.setSelectedModelId(localModelSelect.value);
+      hideLocalAiDiagnostic();
       await refreshModelStatus();
       updateEngineIndicator();
     };
@@ -4858,7 +4889,9 @@ async function initLocalAiSettings() {
   if (downloadModelBtn) {
     downloadModelBtn.onclick = async () => {
       const modelId = localModelSelect ? localModelSelect.value : localAi.getSelectedModelId();
+      hideLocalAiDiagnostic();
       downloadModelBtn.disabled = true;
+      downloadModelBtn.textContent = 'Downloading...';
       if (deleteModelBtn) deleteModelBtn.style.display = 'none';
       if (localAiProgressWrap) localAiProgressWrap.removeAttribute('hidden');
 
@@ -4875,11 +4908,17 @@ async function initLocalAiSettings() {
 
         showToast('Local AI model downloaded and loaded in WebGPU!', 'success');
         if (localAiProgressWrap) localAiProgressWrap.setAttribute('hidden', '');
+        hideLocalAiDiagnostic();
         await refreshModelStatus();
         updateEngineIndicator();
       } catch (err) {
-        showToast(`Model download failed: ${err.message}`, 'error');
-        if (localAiProgressText) localAiProgressText.textContent = `Error: ${err.message}`;
+        const diag = typeof localAi.parseLocalAIError === 'function'
+          ? localAi.parseLocalAIError(err)
+          : { category: 'Model download failed', title: 'Model Download Failed', message: err.message, details: err.message };
+        showLocalAiDiagnostic(diag);
+        showToast(`${diag.title}: ${diag.category}`, 'error');
+        if (localAiProgressText) localAiProgressText.textContent = `[${diag.category}] ${diag.message}`;
+        downloadModelBtn.textContent = 'Retry Download';
         downloadModelBtn.disabled = false;
         updateEngineIndicator();
       }
@@ -4896,6 +4935,8 @@ async function initLocalAiSettings() {
       try {
         await localAi.deleteLocalModel(modelId);
         showToast('Local model cache deleted from browser storage.', 'info');
+        hideLocalAiDiagnostic();
+        if (downloadModelBtn) downloadModelBtn.textContent = 'Download Model';
         await refreshModelStatus();
         updateEngineIndicator();
       } catch (err) {

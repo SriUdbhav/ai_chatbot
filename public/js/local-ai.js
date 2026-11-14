@@ -21,6 +21,7 @@ export const SUPPORTED_MODELS = [
     name: 'Qwen2.5-Coder 1.5B (Recommended)',
     tagline: 'High quality C programming, DSA, algorithms & structured explanations',
     sizeEstimate: '~980 MB',
+    requiredStorageMB: 1100,
     vramEstimate: '~1.6 GB VRAM',
     isDefault: true
   },
@@ -29,6 +30,7 @@ export const SUPPORTED_MODELS = [
     name: 'Qwen2.5-Coder 0.5B (Ultra-Light)',
     tagline: 'Fast download, minimal VRAM, standard C & algorithms',
     sizeEstimate: '~390 MB',
+    requiredStorageMB: 480,
     vramEstimate: '~950 MB VRAM',
     isDefault: false
   },
@@ -37,6 +39,7 @@ export const SUPPORTED_MODELS = [
     name: 'Llama-3.2 1B Instruct',
     tagline: 'Fast general-purpose academic study companion by Meta',
     sizeEstimate: '~700 MB',
+    requiredStorageMB: 800,
     vramEstimate: '~880 MB VRAM',
     isDefault: false
   }
@@ -154,6 +157,31 @@ export async function getStorageQuota() {
   return null;
 }
 
+/**
+ * Validates available browser storage quota against model size before downloading.
+ * @param {string} [modelId]
+ * @returns {Promise<{sufficient: boolean, freeMB?: number, neededMB?: number, message?: string}>}
+ */
+export async function checkStorageQuotaForModel(modelId) {
+  const targetId = modelId || getSelectedModelId();
+  const model = SUPPORTED_MODELS.find(m => m.id === targetId) || SUPPORTED_MODELS[0];
+  const quota = await getStorageQuota();
+  if (quota && quota.quotaMB && typeof quota.usageMB === 'number') {
+    const freeMB = Math.max(0, quota.quotaMB - quota.usageMB);
+    const neededMB = model.requiredStorageMB || 1000;
+    if (freeMB < neededMB) {
+      return {
+        sufficient: false,
+        freeMB,
+        neededMB,
+        message: `Storage quota exceeded: Model requires ~${neededMB} MB, but your browser has only ~${freeMB} MB free space available. Please free up browser storage space.`
+      };
+    }
+    return { sufficient: true, freeMB, neededMB };
+  }
+  return { sufficient: true, freeMB: null, neededMB: model.requiredStorageMB || 1000 };
+}
+
 // ── 6. Model Cache Management ─────────────────────────────────────────────────
 export async function isModelCached(modelId) {
   try {
@@ -197,6 +225,66 @@ export function getIsGenerating() {
   return isGenerating;
 }
 
+/**
+ * Classifies Local AI errors into structured diagnostic categories.
+ * @param {Error|any} err
+ * @param {object} [context]
+ */
+export function parseLocalAIError(err, context = {}) {
+  const msg = (err && err.message) ? err.message : String(err);
+  let category = 'Model download failed';
+  let title = 'Model Download Error';
+  let friendlyMessage = msg;
+  let details = '';
+
+  if (msg.includes('WebGPU') || msg.includes('adapter') || msg.includes('hardware acceleration')) {
+    category = 'WebGPU unavailable';
+    title = 'WebGPU Unavailable';
+    friendlyMessage = 'WebGPU is not available in this browser or hardware acceleration is disabled. Open in Chrome 113+ or Edge 113+ with hardware acceleration turned ON in browser settings.';
+    details = msg;
+  } else if (msg.includes('Storage quota exceeded') || err?.code === 'QUOTA_EXCEEDED' || msg.includes('QuotaExceeded') || msg.includes('quota')) {
+    category = 'Storage quota exceeded';
+    title = 'Storage Quota Exceeded';
+    friendlyMessage = msg;
+    details = 'Browser storage limit reached. Please clear browser site data or cache to make room for model weights.';
+  } else if (context.phase === 'worker_init' || err?.code === 'WORKER_INIT_FAILED' || msg.includes('Worker') || msg.includes('worker') || msg.includes('Failed to construct')) {
+    category = 'Worker initialization failed';
+    title = 'Worker Initialization Failed';
+    friendlyMessage = 'Could not initialize the background Web Worker for local AI. Ensure JavaScript modules are supported in your browser.';
+    details = `Script path: /js/webllm-worker.js | Error: ${msg}`;
+  } else if (msg.includes('404') || msg.includes('Cannot find model_id') || msg.includes('ModelNotFoundError') || msg.includes('repository')) {
+    category = 'Model repository unavailable';
+    title = 'Model Repository Unavailable';
+    friendlyMessage = 'The model repository or metadata could not be found or reached on the model repository. Please verify internet access and retry.';
+    details = context.url ? `Target URL: ${context.url} | Error: ${msg}` : msg;
+  } else if (msg.includes('Network connection interrupted') || msg.includes('AbortError') || msg.includes('Failed to fetch') || msg.includes('fetch failed') || msg.includes('network') || !navigator.onLine) {
+    category = 'Download interrupted';
+    title = 'Download Interrupted';
+    friendlyMessage = navigator.onLine
+      ? 'The model download was interrupted due to a temporary network issue. Your downloaded shards are saved in browser cache — click "Retry Download" to resume.'
+      : 'Internet connection lost. Reconnect to internet and click "Retry Download" to resume where you left off.';
+    details = msg;
+  } else if (context.phase === 'model_init' || msg.includes('shader') || msg.includes('pipeline') || msg.includes('device lost') || msg.includes('device')) {
+    category = 'Model initialization failed';
+    title = 'Model Initialization Failed';
+    friendlyMessage = 'The model files downloaded successfully, but the WebGPU pipeline failed to compile or allocate GPU buffers. Your device may be low on GPU VRAM.';
+    details = msg;
+  } else {
+    category = 'Model download failed';
+    title = 'Model Download Failed';
+    friendlyMessage = `Unable to complete model download: ${msg}. Already-downloaded shards are preserved; click "Retry Download" to resume.`;
+    details = msg;
+  }
+
+  return {
+    category,
+    title,
+    message: friendlyMessage,
+    details,
+    rawError: msg
+  };
+}
+
 export async function initEngine(modelId, onProgress) {
   const targetModel = modelId || getSelectedModelId();
 
@@ -204,12 +292,23 @@ export async function initEngine(modelId, onProgress) {
     return activeEngine;
   }
 
+  // 1. WebGPU hardware detection & diagnostics
   const gpuCheck = await checkWebGPUSupport();
   if (!gpuCheck.supported) {
-    throw new Error(gpuCheck.reason);
+    const err = new Error(gpuCheck.reason);
+    err.code = 'WEBGPU_UNAVAILABLE';
+    throw err;
   }
 
-  // Request persistent storage so model weights aren't evicted
+  // 2. Storage quota validation before downloading
+  const quotaCheck = await checkStorageQuotaForModel(targetModel);
+  if (!quotaCheck.sufficient) {
+    const err = new Error(quotaCheck.message);
+    err.code = 'QUOTA_EXCEEDED';
+    throw err;
+  }
+
+  // 3. Request persistent storage so model weights aren't evicted
   await requestPersistentStorage();
 
   // If another model is active, unload it
@@ -218,11 +317,25 @@ export async function initEngine(modelId, onProgress) {
   }
 
   isInitializing = true;
+  let workerFailed = false;
+  let workerError = null;
+
   try {
+    // 4. Instantiate Web Worker with runtime error detection
     activeWorker = new Worker('/js/webllm-worker.js', { type: 'module' });
+    activeWorker.onerror = (e) => {
+      workerFailed = true;
+      workerError = e;
+      console.error('[LocalAI] Web Worker runtime error during init:', e);
+    };
+
+    let currentPhase = 'downloading';
 
     activeEngine = await webllm.CreateWebWorkerMLCEngine(activeWorker, targetModel, {
       initProgressCallback: (report) => {
+        if (report && typeof report.progress === 'number' && report.progress >= 1.0) {
+          currentPhase = 'model_init';
+        }
         if (typeof onProgress === 'function') {
           onProgress(report);
         }
@@ -237,6 +350,11 @@ export async function initEngine(modelId, onProgress) {
     isInitializing = false;
     await unloadEngine();
     console.error('[LocalAI] Engine initialization failed:', err);
+    if (workerFailed && workerError) {
+      const wrapped = new Error(`Worker initialization failed: ${workerError.message || 'Worker thread script error'}`);
+      wrapped.code = 'WORKER_INIT_FAILED';
+      throw wrapped;
+    }
     throw err;
   }
 }

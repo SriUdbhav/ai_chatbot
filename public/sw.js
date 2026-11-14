@@ -5,7 +5,7 @@
 
 'use strict';
 
-const CACHE_VERSION = 'v1.2.0';
+const CACHE_VERSION = 'v1.2.1';
 const STATIC_CACHE = `studymate-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `studymate-runtime-${CACHE_VERSION}`;
 
@@ -102,12 +102,27 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Rule 0: Bypass Service Worker for external AI model weights & HuggingFace/GitHub CDN assets
-  // WebLLM manages its own persistent CacheStorage ('webllm/model', 'webllm/wasm')
+  // Rule 0: Bypass Service Worker for external AI model weights & CDNs
+  // WebLLM manages its own persistent CacheStorage ('webllm/model', 'webllm/wasm', 'webllm/config')
+  // We MUST NEVER intercept or proxy Hugging Face (huggingface.co, *.hf.co), GitHub (raw.githubusercontent.com, github.com),
+  // LFS CDNs, or external AI assets.
+  const isSameOrigin = url.origin === self.location.origin;
+  const isGoogleFont = url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com');
+
+  if (!isSameOrigin && !isGoogleFont) {
+    // Non-origin requests that are not Google Fonts must completely bypass Service Worker!
+    // This allows the browser to stream gigabyte-sized model weights directly to WebLLM/OPFS/CacheStorage
+    // without SW timeouts, memory termination, or CORS redirect issues.
+    return;
+  }
+
+  // Also explicitly bypass any model weights, wasm binaries, or tensor manifests even if requested relatively
   if (
-    url.hostname.includes('huggingface.co') ||
-    url.hostname.includes('raw.githubusercontent.com') ||
-    url.hostname.includes('github.com') ||
+    url.pathname.endsWith('.bin') ||
+    url.pathname.endsWith('.wasm') ||
+    url.pathname.endsWith('.safetensors') ||
+    url.pathname.endsWith('ndarray-cache.json') ||
+    url.pathname.endsWith('mlc-chat-config.json') ||
     url.pathname.includes('/mlc-ai/')
   ) {
     return;

@@ -1625,6 +1625,16 @@
                 </div>
               </div>
 
+              <!-- Diagnostics & Error Box (Phase 5) -->
+              <div class="local-ai-diagnostic-box" id="localAiDiagnosticBox" style="display: none; margin-top: 0.75rem; margin-bottom: 0.5rem; padding: 0.65rem 0.85rem; border-radius: 8px; font-size: 0.82rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--app-text-primary);">
+                <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 600; color: #ef4444; margin-bottom: 0.25rem;">
+                  <span id="localAiDiagnosticBadge" class="status-badge-inline" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 0.7rem; padding: 1px 6px;">Error</span>
+                  <span id="localAiDiagnosticTitle">Diagnostic Error</span>
+                </div>
+                <div id="localAiDiagnosticMessage" style="line-height: 1.4; word-break: break-word;"></div>
+                <div id="localAiDiagnosticDetails" style="font-family: var(--font-mono, monospace); font-size: 0.75rem; opacity: 0.8; margin-top: 0.35rem; padding: 0.35rem 0.5rem; background: rgba(0, 0, 0, 0.15); border-radius: 4px; word-break: break-all; display: none;"></div>
+              </div>
+
               <!-- Action Buttons -->
               <div class="model-action-buttons">
                 <button type="button" class="btn-primary-sm" id="downloadModelBtn">Download Model</button>

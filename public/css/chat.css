@@ -5519,6 +5519,22 @@ body[data-theme="dark"] .btn-remove-doc:hover {
   max-width: 80%;
 }
 
+.local-ai-diagnostic-box {
+  border-radius: var(--radius-md, 8px);
+  padding: 0.65rem 0.85rem;
+  font-size: 0.82rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--app-text-primary, #0f172a);
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .local-ai-diagnostic-box {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--app-text-primary, #f1f5f9);
+}
+
 .model-action-buttons {
   display: flex;
   align-items: center;
