@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#4f46e5">
+  <title>Offline | StudyMate AI</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .offline-card {
+      background: #161b22;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    }
+
+    .icon-wrapper {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 1.5rem;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
+    }
+
+    .offline-badge {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      background: #dc2626;
+      border: 2px solid #161b22;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+    }
+
+    .brand-title {
+      font-size: 0.85rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #818cf8;
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 0.75rem;
+    }
+
+    .desc {
+      font-size: 0.95rem;
+      color: #94a3b8;
+      margin-bottom: 1.5rem;
+    }
+
+    .info-box {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: left;
+      font-size: 0.86rem;
+      color: #cbd5e1;
+      margin-bottom: 1.75rem;
+    }
+
+    .info-box ul {
+      list-style-type: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .info-box li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .info-box li span.bullet {
+      color: #818cf8;
+      font-weight: bold;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .btn-retry {
+      background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+      color: #ffffff;
+      border: none;
+      padding: 0.85rem 1.5rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+
+    .btn-retry:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .btn-home {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 0.75rem 1.5rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .btn-home:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #ffffff;
+    }
+
+    .status-text {
+      margin-top: 1.25rem;
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-card">
+    <div class="icon-wrapper">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+        <path d="M2 17l10 5 10-5"></path>
+        <path d="M2 12l10 5 10-5"></path>
+      </svg>
+      <div class="offline-badge" title="No Internet Connection">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+          <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+          <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+          <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+          <line x1="12" y1="20" x2="12.01" y2="20"></line>
+        </svg>
+      </div>
+    </div>
+
+    <div class="brand-title">StudyMate AI</div>
+    <h1>You're Currently Offline</h1>
+    <p class="desc">We couldn't connect to the internet. StudyMate AI requires a network connection to communicate with Google Gemini AI.</p>
+
+    <div class="info-box">
+      <ul>
+        <li>
+          <span class="bullet">•</span>
+          <span>Previously cached conversations and notes are saved locally in your browser.</span>
+        </li>
+        <li>
+          <span class="bullet">•</span>
+          <span>Live Gemini AI answers, document summaries, and quizzes will resume automatically once you reconnect.</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="actions">
+      <button class="btn-retry" onclick="window.location.reload()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        Retry Connection
+      </button>
+      <a href="/" class="btn-home">Open StudyMate AI Workspace</a>
+    </div>
+
+    <p class="status-text" id="statusMessage">Checking network status...</p>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('statusMessage');
+    function updateStatus() {
+      if (navigator.onLine) {
+        statusEl.textContent = 'Connection restored! Reloading...';
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        statusEl.textContent = 'Offline. Waiting for internet connection...';
+      }
+    }
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    updateStatus();
+  </script>
+</body>
+</html>
+

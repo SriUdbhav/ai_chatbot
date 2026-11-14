@@ -26,7 +26,16 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // ── 2. Static assets ─────────────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('sw.js')) {
+      res.setHeader('Service-Worker-Allowed', '/');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    } else if (filePath.endsWith('.webmanifest')) {
+      res.setHeader('Content-Type', 'application/manifest+json');
+    }
+  }
+}));
 
 // ── 3. Body parsing with a strict size limit ──────────────────────────────────
 //  The JSON limit is set to 64 KB — more than enough for any reasonable chat

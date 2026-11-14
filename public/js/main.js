@@ -6,6 +6,19 @@
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🎓 [AI Study Assistant] Client JS initialized successfully.');
 
+  // Sync and apply global surface opacity from localStorage
+  try {
+    const savedOpacity = localStorage.getItem('studymate_surface_opacity');
+    if (savedOpacity !== null) {
+      const num = parseInt(savedOpacity, 10);
+      if (!isNaN(num) && num >= 20 && num <= 100) {
+        const dec = (num / 100).toFixed(2);
+        document.documentElement.style.setProperty('--app-surface-opacity', dec);
+        document.documentElement.style.setProperty('--surface-opacity', dec);
+      }
+    }
+  } catch (e) {}
+
   const pingBtn = document.getElementById('ping-btn');
   const pingResult = document.getElementById('ping-result');
 
@@ -43,6 +56,19 @@ document.addEventListener('DOMContentLoaded', () => {
       } finally {
         pingBtn.disabled = false;
       }
+    });
+  }
+
+  // Register PWA Service Worker safely
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then((reg) => {
+          console.log('[PWA] Service Worker active with scope:', reg.scope);
+        })
+        .catch((err) => {
+          console.warn('[PWA] Service Worker registration failed:', err);
+        });
     });
   }
 });

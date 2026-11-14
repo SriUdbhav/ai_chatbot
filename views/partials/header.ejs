@@ -13,6 +13,38 @@
   
   <!-- Stylesheet -->
   <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Progressive Web App Meta & Manifest -->
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="StudyMate AI">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <!-- Immediate Global Surface Opacity & Sidebar Initialization (Prevents flash) -->
+  <script>
+    (function() {
+      try {
+        var savedOpacity = localStorage.getItem('studymate_surface_opacity');
+        if (savedOpacity !== null) {
+          var num = parseInt(savedOpacity, 10);
+          if (!isNaN(num) && num >= 20 && num <= 100) {
+            var dec = (num / 100).toFixed(2);
+            document.documentElement.style.setProperty('--app-surface-opacity', dec);
+            document.documentElement.style.setProperty('--surface-opacity', dec);
+          }
+        }
+        var savedSidebar = localStorage.getItem('studymate_sidebar_collapsed');
+        if (savedSidebar === 'true' && window.innerWidth > 768) {
+          document.documentElement.classList.add('sidebar-collapsed');
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <!-- Header / Navigation -->

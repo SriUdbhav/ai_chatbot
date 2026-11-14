@@ -13,8 +13,13 @@ const { GoogleGenAI } = require('@google/genai');
 // ── Model selection ────────────────────────────────────────────────────────────
 // Preferred model: gemini-3.5-flash-lite (fast, highly available, low latency).
 // Fallback: gemini-3.8-flash.
-const PREFERRED_MODEL  = 'gemini-3.5-flash-lite';
-const FALLBACK_MODEL   = 'gemini-3.8-flash';
+// Preferred Image Models: Gemini 3.1 generation
+// Fast Mode: gemini-3.1-flash-lite-image (lowest latency, 512px preview, minimal thinking)
+// Quality Mode: gemini-3.1-flash-image (high-detail 1K/2K resolution)
+const FAST_IMAGE_MODEL       = 'gemini-3.1-flash-lite-image';
+const QUALITY_IMAGE_MODEL    = 'gemini-3.1-flash-image';
+const PREFERRED_IMAGE_MODEL  = FAST_IMAGE_MODEL;
+const FALLBACK_IMAGE_MODEL   = QUALITY_IMAGE_MODEL;
 
 /**
  * Returns the active model name from env, or the preferred default.
@@ -29,6 +34,36 @@ function getModelName() {
  */
 function getFallbackModelName() {
   return FALLBACK_MODEL;
+}
+
+/**
+ * Returns the active image generation model name from env or default based on mode.
+ * @param {'fast'|'quality'} [mode='fast']
+ */
+function getImageModelName(mode = 'fast') {
+  if (process.env.GEMINI_IMAGE_MODEL) return process.env.GEMINI_IMAGE_MODEL;
+  return mode === 'quality' ? QUALITY_IMAGE_MODEL : FAST_IMAGE_MODEL;
+}
+
+/**
+ * Returns the fast image generation model name.
+ */
+function getFastImageModelName() {
+  return FAST_IMAGE_MODEL;
+}
+
+/**
+ * Returns the quality image generation model name.
+ */
+function getQualityImageModelName() {
+  return QUALITY_IMAGE_MODEL;
+}
+
+/**
+ * Returns the fallback image generation model name.
+ */
+function getFallbackImageModelName() {
+  return FALLBACK_IMAGE_MODEL;
 }
 
 /**
@@ -63,4 +98,8 @@ module.exports = {
   getGenAIClient,
   getModelName,
   getFallbackModelName,
+  getImageModelName,
+  getFallbackImageModelName,
+  getFastImageModelName,
+  getQualityImageModelName,
 };

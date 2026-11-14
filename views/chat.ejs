@@ -14,6 +14,17 @@
   <!-- Application Stylesheets -->
   <link rel="stylesheet" href="/css/chat.css">
 
+  <!-- Progressive Web App Meta & Manifest -->
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="StudyMate AI">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
   <!-- Client-side Configuration -->
   <script id="app-config" type="application/json">
     <%- JSON.stringify({
@@ -35,6 +46,30 @@
       };
     }
   </script>
+  <!-- Immediate Theme & Global Surface Opacity Initialization (Prevents flash) -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('studymate_theme_v1');
+        if (savedTheme === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+        var savedOpacity = localStorage.getItem('studymate_surface_opacity');
+        if (savedOpacity !== null) {
+          var num = parseInt(savedOpacity, 10);
+          if (!isNaN(num) && num >= 20 && num <= 100) {
+            var dec = (num / 100).toFixed(2);
+            document.documentElement.style.setProperty('--app-surface-opacity', dec);
+            document.documentElement.style.setProperty('--surface-opacity', dec);
+          }
+        }
+        var savedSidebar = localStorage.getItem('studymate_sidebar_collapsed');
+        if (savedSidebar === 'true' && window.innerWidth > 768) {
+          document.documentElement.classList.add('sidebar-collapsed');
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body class="app-body" data-theme="dark">
 
@@ -46,7 +81,7 @@
     <!-- Brand Header -->
     <div class="sidebar-header">
       <div class="brand">
-        <div class="brand-icon" aria-hidden="true">
+        <div class="brand-icon" aria-hidden="true" title="StudyMate AI">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
           </svg>
@@ -64,7 +99,7 @@
 
     <!-- Primary Action: New Chat -->
     <div class="sidebar-action-wrap">
-      <button class="new-chat-btn" id="newChatBtn" aria-label="Start a new conversation">
+      <button class="new-chat-btn" id="newChatBtn" aria-label="Start a new conversation" title="New Chat (Ctrl+K)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         <span>New Chat</span>
       </button>
@@ -74,37 +109,37 @@
     <div class="sidebar-nav-section">
       <p class="sidebar-label">Navigation</p>
       <nav class="nav-menu" aria-label="Primary navigation">
-        <a href="/" class="nav-item active" id="navHome">
+        <a href="/" class="nav-item active" id="navHome" title="Home">
           <span class="nav-icon">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           </span>
           <span class="nav-text">Home</span>
         </a>
-        <button type="button" class="nav-item" id="navSubjectNotes" title="Open Subject Notes Summarizer">
+        <button type="button" class="nav-item" id="navSubjectNotes" title="Subject Notes (Document Reader & Revision Notes)">
           <span class="nav-icon">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           </span>
           <span class="nav-text">Subject Notes</span>
         </button>
-        <button type="button" class="nav-item" id="navPracticeQuiz" title="Open Practice & Quiz Generator">
+        <button type="button" class="nav-item" id="navPracticeQuiz" title="Practice & Quiz Generator">
           <span class="nav-icon">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </span>
           <span class="nav-text">Practice &amp; Quiz</span>
         </button>
-        <button type="button" class="nav-item" id="navStudyPlanner" title="Open Study Planner">
+        <button type="button" class="nav-item" id="navStudyPlanner" title="Study Planner & Exam Schedules">
           <span class="nav-icon">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           </span>
           <span class="nav-text">Study Planner</span>
         </button>
-        <button type="button" class="nav-item" id="navSavedItems" title="View Saved Notes & Responses">
+        <button type="button" class="nav-item" id="navSavedItems" title="Saved Notes & Responses">
           <span class="nav-icon">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
           </span>
           <span class="nav-text">Saved Items</span>
         </button>
-        <button type="button" class="nav-item" id="navSettings" title="StudyMate AI Settings">
+        <button type="button" class="nav-item" id="navSettings" title="Preferences & Diagnostics">
           <span class="nav-icon">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </span>
@@ -117,7 +152,15 @@
     <div class="sidebar-tools-section">
       <div class="sidebar-section-header">
         <p class="sidebar-label">AI Study Tools</p>
-        <button type="button" class="open-all-tools-link" id="sidebarAllToolsLink">All Tools</button>
+        <div class="sidebar-tools-header-actions">
+          <button type="button" class="topbar-tools-btn sidebar-tools-btn" id="openToolsBtn" title="Open AI Study Tools Modal" aria-label="Open AI Study Tools">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+            </svg>
+            <span>Tools</span>
+          </button>
+          <button type="button" class="open-all-tools-link" id="sidebarAllToolsLink">All</button>
+        </div>
       </div>
       <div class="tools-grid">
         <button class="tool-btn" data-tool="explain" id="sidebarToolExplain" title="Concept Explainer">
@@ -145,6 +188,24 @@
         <p class="sidebar-label">Chat History</p>
         <button type="button" class="sidebar-clear-all-btn" id="sidebarClearAllBtn" title="Clear all conversation history" aria-label="Clear all conversations">Clear All</button>
       </div>
+
+      <!-- Compact Search Bar in Chat History -->
+      <div class="sidebar-search-wrap" role="search" title="Search chats, topics or subjects">
+        <span class="sidebar-search-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </span>
+        <input
+          type="search"
+          id="chatSearchInput"
+          class="sidebar-search-input"
+          placeholder="Search chats or topics…"
+          aria-label="Search chats, topics or subjects"
+        >
+      </div>
+
       <nav class="convo-list" id="convoList" aria-label="Recent conversations">
         <p class="convo-empty" id="convoEmpty">No conversations yet.<br>Start your first session above!</p>
       </nav>
@@ -175,8 +236,12 @@
       <!-- Top Navigation Bar -->
       <header class="chat-topbar">
         <div class="topbar-left">
-          <button class="topbar-menu-btn" id="sidebarOpenBtn" aria-label="Open sidebar" title="Toggle Navigation Sidebar">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <button class="topbar-menu-btn" id="sidebarOpenBtn" aria-label="Toggle navigation sidebar" aria-expanded="true" title="Toggle Navigation Sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <line x1="3" y1="12" x2="21" y2="12"/>
+              <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
           </button>
           <div class="topbar-title-wrap">
             <h1 class="topbar-title" id="topbarTitle">StudyMate AI</h1>
@@ -184,57 +249,52 @@
           </div>
         </div>
 
-        <div class="topbar-center">
-          <!-- Search chats, topics or subjects -->
-          <div class="topbar-search-wrap" role="search">
-            <span class="topbar-search-icon" aria-hidden="true">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        <div class="topbar-actions topbar-right">
+          <!-- Compact AI engine status indicator (Gemini / Local AI / Offline) -->
+          <div class="offline-badge-pill" id="offlineIndicatorBadge" role="status" aria-live="polite" hidden title="You are currently offline. Gemini AI features require an internet connection.">
+            <span class="offline-dot"></span>
+            <span class="offline-pill-text">Offline</span>
+          </div>
+
+          <button type="button" class="engine-indicator-pill" id="engineIndicatorPill" role="status" title="Active AI Engine — Click to configure in Settings">
+            <span class="engine-indicator-dot dot-green" id="engineIndicatorDot"></span>
+            <span class="engine-indicator-text" id="engineIndicatorText">Gemini AI</span>
+          </button>
+
+          <!-- Compact Transparency Controller Button & Popover -->
+          <div class="transparency-ctrl-wrapper" id="transparencyCtrlWrapper">
+            <button type="button" class="icon-btn transparency-toggle-btn" id="topbarTransparencyBtn" title="Interface Transparency & Visual Accessibility (20% – 100%)" aria-label="Adjust surface transparency" aria-haspopup="true" aria-expanded="false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 2a10 10 0 0 0 0 20v-20z"></path>
               </svg>
-            </span>
-            <input
-              type="search"
-              id="chatSearchInput"
-              class="topbar-search-input"
-              placeholder="Search chats, topics or subjects…"
-              aria-label="Search chats, topics or subjects"
-            >
+            </button>
+            <div class="transparency-popover" id="topbarTransparencyPopover" role="dialog" aria-label="Adjust surface transparency" hidden>
+              <div class="transparency-popover-header">
+                <span class="transparency-popover-title">Transparency</span>
+                <span class="transparency-popover-val" id="topbarTransparencyVal">100%</span>
+              </div>
+              <div class="transparency-popover-slider-wrap">
+                <input
+                  type="range"
+                  id="topbarTransparencySlider"
+                  class="surface-opacity-slider topbar-opacity-slider"
+                  min="20"
+                  max="100"
+                  value="100"
+                  step="1"
+                  aria-label="Interface surface transparency percentage"
+                >
+                <div class="transparency-popover-labels">
+                  <span>20% (Glass)</span>
+                  <span>100% (Solid)</span>
+                </div>
+              </div>
+              <div class="transparency-popover-actions">
+                <button type="button" class="btn-popover-reset" id="topbarResetOpacityBtn">Reset to Default</button>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div class="topbar-actions">
-          <!-- Learning Mode Selector -->
-          <div class="mode-selector-wrapper" title="Change Study Mode Guidance">
-            <span class="mode-badge-label">Mode:</span>
-            <select class="mode-select" id="studyModeSelect" aria-label="Select study mode">
-              <option value="standard" selected>🎓 Standard Academic</option>
-              <option value="simple">💡 Simple Explanation</option>
-              <option value="step_by_step">🪜 Step-by-Step</option>
-              <option value="exam_prep">📋 Exam Prep</option>
-              <option value="practice">❓ Practice Questions</option>
-              <option value="code_focus">💻 Code Focus</option>
-            </select>
-          </div>
-
-          <!-- Document Studio Modal Trigger Button -->
-          <button class="topbar-tools-btn topbar-doc-btn" id="openDocStudioBtn" title="AI Document Reader & Study Notes (PDF, DOCX, TXT)" aria-label="Upload Document and Generate Notes">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="12" y1="18" x2="12" y2="12"></line>
-              <line x1="9" y1="15" x2="15" y2="15"></line>
-            </svg>
-            <span>Upload Doc</span>
-          </button>
-
-          <!-- Tools Modal Button -->
-          <button class="topbar-tools-btn" id="openToolsBtn" title="Open AI Study Tools Modal" aria-label="Open AI Study Tools">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-            </svg>
-            <span>Tools</span>
-          </button>
 
           <!-- Theme Toggle Button -->
           <button type="button" class="icon-btn theme-toggle-btn" id="themeToggleBtn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
@@ -287,15 +347,61 @@
             </div>
           </div>
 
-          <!-- Simple Profile Display (No auth required) -->
-          <div class="profile-chip" id="profileChip" title="Active Student Session (Local Guest)">
-            <div class="profile-avatar">S</div>
-            <div class="profile-meta">
-              <span class="profile-name">Student</span>
-              <span class="profile-status"><span class="status-dot dot-green"></span>Active</span>
+          <!-- Student profile avatar with dropdown -->
+          <div class="profile-wrapper">
+            <button type="button" class="profile-chip" id="profileChip" title="Active Student Session — Click for options" aria-haspopup="true" aria-expanded="false" aria-label="Student Profile Menu">
+              <div class="profile-avatar">S</div>
+              <div class="profile-meta">
+                <span class="profile-name">Student</span>
+                <span class="profile-status"><span class="status-dot dot-green"></span>Active</span>
+              </div>
+              <svg class="profile-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="profile-dropdown" id="profileDropdown" hidden>
+              <div class="profile-dropdown-header">
+                <div class="profile-avatar large">S</div>
+                <div class="profile-dropdown-info">
+                  <span class="profile-dropdown-name">Student Scholar</span>
+                  <span class="profile-dropdown-role"><span class="status-dot dot-green"></span> Active Session</span>
+                </div>
+              </div>
+              <div class="profile-dropdown-menu">
+                <button type="button" class="profile-menu-item" id="profileSettingsBtn">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                  <span>Preferences &amp; Diagnostics</span>
+                </button>
+                <button type="button" class="profile-menu-item" id="profileSavedBtn">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                  <span>Saved Notes &amp; Responses</span>
+                </button>
+                <button type="button" class="profile-menu-item" id="profilePlannerBtn">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span>Study Planner</span>
+                </button>
+              </div>
             </div>
           </div>
+        </div>
+      </header>
 
+      <!-- ── Workspace Options Subbar (Relocated Study Mode & Action Controls) ── -->
+      <div class="workspace-subbar" id="workspaceSubbar" role="toolbar" aria-label="Chat workspace options">
+        <div class="workspace-subbar-left">
+          <!-- Learning Mode Selector -->
+          <div class="mode-selector-wrapper" title="Change Study Mode Guidance">
+            <span class="mode-badge-label">Study Mode:</span>
+            <select class="mode-select" id="studyModeSelect" aria-label="Select study mode">
+              <option value="standard" selected>🎓 Standard Academic</option>
+              <option value="simple">💡 Simple Explanation</option>
+              <option value="step_by_step">🪜 Step-by-Step</option>
+              <option value="exam_prep">📋 Exam Prep</option>
+              <option value="practice">❓ Practice Questions</option>
+              <option value="code_focus">💻 Code Focus</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="workspace-subbar-right">
           <!-- Toggle Right Study Panel -->
           <button class="icon-btn study-panel-toggle-btn" id="studyPanelToggleBtn" title="Toggle Study Insights Panel" aria-label="Toggle Study Panel">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
@@ -306,7 +412,22 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
           </button>
         </div>
-      </header>
+      </div>
+
+      <!-- Offline Notification Banner (hidden by default, displayed when offline) -->
+      <div class="offline-status-banner" id="offlineBanner" role="status" aria-live="polite" hidden>
+        <div class="offline-banner-content">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+            <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+            <line x1="12" y1="20" x2="12.01" y2="20"></line>
+          </svg>
+          <span class="offline-banner-text"><strong>Offline Mode:</strong> Viewing cached interface. Gemini AI responses and server tools require an active internet connection.</span>
+        </div>
+      </div>
 
       <!-- Scrollable Message Area -->
       <main class="messages-area" id="messagesArea" role="log" aria-live="polite" aria-label="Conversation Messages">
@@ -480,46 +601,123 @@
           <button type="button" class="quick-pill" data-quick="step" title="Break down solution step-by-step">
             <span class="quick-pill-emoji">🪜</span> Step-by-Step
           </button>
+          <button type="button" class="quick-pill quick-pill-image" data-quick="image" title="Generate an AI illustration or diagram">
+            <span class="quick-pill-emoji">🎨</span> Generate Image
+          </button>
+          <!-- Image Generation Performance Mode Selector -->
+          <div class="image-mode-selector" id="imageModeSelector" role="group" aria-label="Image Generation Mode">
+            <button type="button" class="img-mode-pill active" id="imgModeFastBtn" data-img-mode="fast" title="Fast Mode: 512px preview, minimal latency (~1s)">
+              <span class="mode-icon">⚡</span> Fast (512px)
+            </button>
+            <button type="button" class="img-mode-pill" id="imgModeQualityBtn" data-img-mode="quality" title="Quality Mode: 1024px high-detail rendering">
+              <span class="mode-icon">✨</span> Quality (1K)
+            </button>
+          </div>
         </div>
 
         <!-- Chat Form -->
         <form class="composer" id="chatForm" autocomplete="off" aria-label="Send a message to StudyMate AI">
-          <div class="composer-inner">
-            <textarea
-              class="composer-input"
-              id="messageInput"
-              placeholder="Ask anything or request a solution… (Shift+Enter for new line)"
-              rows="1"
-              maxlength="4000"
-              aria-label="Message input"
-              aria-multiline="true"
-            ></textarea>
+          <div class="composer-card" id="composerCard">
+            <!-- Selected Attachment Chips Container (Above Input, inside composer card) -->
+            <div class="composer-attachments" id="composerAttachments" hidden aria-label="Attached files"></div>
 
-            <div class="composer-controls">
-              <!-- Speech Dictation -->
-              <button class="composer-icon-btn mic-btn" id="micBtn" type="button" aria-label="Voice input" title="Voice dictation (Speak your question)">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/>
-                  <line x1="8" y1="23" x2="16" y2="23"/>
-                </svg>
-              </button>
+            <div class="composer-inner">
+              <!-- Plus Attachment Button & Popup Menu (Positioned on the Left) -->
+              <div class="composer-attach-wrapper">
+                <button class="composer-icon-btn attach-btn" id="attachBtn" type="button" aria-label="Add attachment" title="Add attachment (PDF, DOCX, PPTX, Image, Text)" aria-haspopup="true" aria-expanded="false">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
 
-              <!-- Stop Generating Button -->
-              <button class="stop-btn" id="stopBtn" type="button" aria-label="Stop generating" title="Stop generating response" hidden>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="5" y="5" width="14" height="14" rx="2"></rect>
-                </svg>
-                <span>Stop</span>
-              </button>
+                <!-- Attachment Popup Menu -->
+                <div class="attachment-menu" id="attachmentMenu" role="menu" aria-label="Attachment options" hidden>
+                  <button type="button" class="attachment-menu-item" data-action="upload-pdf" role="menuitem">
+                    <span class="attachment-item-icon pdf-icon">📄</span>
+                    <div class="attachment-item-text">
+                      <span class="attachment-item-title">Upload PDF</span>
+                      <span class="attachment-item-desc">.pdf document</span>
+                    </div>
+                  </button>
+                  <button type="button" class="attachment-menu-item" data-action="upload-docx" role="menuitem">
+                    <span class="attachment-item-icon docx-icon">📝</span>
+                    <div class="attachment-item-text">
+                      <span class="attachment-item-title">Upload Word Document</span>
+                      <span class="attachment-item-desc">.docx document</span>
+                    </div>
+                  </button>
+                  <button type="button" class="attachment-menu-item" data-action="upload-pptx" role="menuitem">
+                    <span class="attachment-item-icon pptx-icon">📊</span>
+                    <div class="attachment-item-text">
+                      <span class="attachment-item-title">Upload PowerPoint</span>
+                      <span class="attachment-item-desc">.pptx presentation</span>
+                    </div>
+                  </button>
+                  <button type="button" class="attachment-menu-item" data-action="upload-image" role="menuitem">
+                    <span class="attachment-item-icon image-icon">🖼️</span>
+                    <div class="attachment-item-text">
+                      <span class="attachment-item-title">Upload Image</span>
+                      <span class="attachment-item-desc">.png, .jpg, .jpeg</span>
+                    </div>
+                  </button>
+                  <button type="button" class="attachment-menu-item" data-action="upload-txt" role="menuitem">
+                    <span class="attachment-item-icon txt-icon">📃</span>
+                    <div class="attachment-item-text">
+                      <span class="attachment-item-title">Upload Text File</span>
+                      <span class="attachment-item-desc">.txt, .md, code</span>
+                    </div>
+                  </button>
+                  <button type="button" class="attachment-menu-item" data-action="generate-image" role="menuitem">
+                    <span class="attachment-item-icon image-gen-icon">🎨</span>
+                    <div class="attachment-item-text">
+                      <span class="attachment-item-title">Generate Image</span>
+                      <span class="attachment-item-desc">Create AI illustrations &amp; diagrams</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
 
-              <!-- Send Button -->
-              <button class="send-btn" id="sendBtn" type="submit" aria-label="Send message" disabled>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                </svg>
-              </button>
+              <!-- Native File Input for Composer (hidden) -->
+              <input type="file" id="composerFileInput" class="sr-only" style="display:none;" multiple aria-hidden="true" />
+
+              <textarea
+                class="composer-input"
+                id="messageInput"
+                placeholder="Ask anything, attach notes or request a solution… (Shift+Enter for new line)"
+                rows="1"
+                maxlength="4000"
+                aria-label="Message input"
+                aria-multiline="true"
+              ></textarea>
+
+              <div class="composer-controls">
+                <button class="sr-only" id="openDocStudioBtn" style="display:none;" aria-hidden="true" tabindex="-1"></button>
+                <!-- Speech Dictation -->
+                <button class="composer-icon-btn mic-btn" id="micBtn" type="button" aria-label="Voice input" title="Voice dictation (Speak your question)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                  </svg>
+                </button>
+
+                <!-- Stop Generating Button -->
+                <button class="stop-btn" id="stopBtn" type="button" aria-label="Stop generating" title="Stop generating response" hidden>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+                  </svg>
+                  <span>Stop</span>
+                </button>
+
+                <!-- Send Button -->
+                <button class="send-btn" id="sendBtn" type="submit" aria-label="Send message" disabled>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           <p class="composer-hint" id="composerHint">
@@ -910,7 +1108,7 @@
               <h2 class="doc-modal-title" id="docStudioTitle">Document Reader &amp; AI Study Notes</h2>
               <span class="doc-status-badge" id="docStatusBadge">No document</span>
             </div>
-            <p class="doc-modal-sub">Upload PDF, DOCX, or TXT to extract knowledge, generate 9-part study notes, and chat with your source</p>
+            <p class="doc-modal-sub">Upload PDF, Word .docx, PowerPoint .pptx, or TXT to extract knowledge, generate high-yield study notes, and chat with your source</p>
           </div>
         </div>
         <button class="modal-close-btn" id="closeDocStudioBtn" aria-label="Close Document Studio">✕</button>
@@ -948,7 +1146,7 @@
           
           <!-- Dropzone Area -->
           <div class="doc-dropzone" id="docDropzone" tabindex="0" role="region" aria-label="File upload dropzone">
-            <input type="file" id="docFileInput" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain" style="display:none;">
+            <input type="file" id="docFileInput" accept=".pdf,.docx,.pptx,.ppt,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/msword,application/vnd.ms-powerpoint,text/plain" style="display:none;">
             <div class="dropzone-icon" aria-hidden="true">
               <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -956,11 +1154,12 @@
                 <line x1="12" y1="3" x2="12" y2="15"></line>
               </svg>
             </div>
-            <h3 class="dropzone-title">Drag &amp; drop your study document here</h3>
+            <h3 class="dropzone-title">Drag &amp; drop your study document or presentation here</h3>
             <p class="dropzone-sub">or <button type="button" class="btn-link" id="docBrowseBtn">browse files from your device</button></p>
             <div class="dropzone-tags">
               <span class="doc-format-pill">PDF (.pdf)</span>
               <span class="doc-format-pill">Word (.docx)</span>
+              <span class="doc-format-pill">PowerPoint (.pptx)</span>
               <span class="doc-format-pill">Plain Text (.txt)</span>
               <span class="doc-format-pill pill-muted">Max 10 MB</span>
             </div>
@@ -982,7 +1181,7 @@
             <div class="alert-icon">⚠️</div>
             <div class="alert-content">
               <h4 class="alert-title" id="docErrorTitle">Upload Failed</h4>
-              <p class="alert-desc" id="docErrorMessage">Please upload a valid PDF, DOCX, or TXT file under 10 MB.</p>
+              <p class="alert-desc" id="docErrorMessage">Please upload a valid PDF, DOCX, PPTX, or TXT file under 10 MB.</p>
             </div>
             <button type="button" class="alert-dismiss-btn" id="docErrorDismissBtn" aria-label="Dismiss error">✕</button>
           </div>
@@ -1232,7 +1431,7 @@
 
   <!-- Settings Modal -->
   <div class="modal-backdrop" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" hidden>
-    <div class="modal-card">
+    <div class="modal-card wide-modal-card">
       <div class="modal-header-simple">
         <div class="modal-title-with-icon">
           <span class="modal-badge-icon">⚙️</span>
@@ -1270,6 +1469,201 @@
           </div>
           <span class="status-badge-inline status-online">Supported</span>
         </div>
+
+        <div class="setting-item" id="pwaSettingItem">
+          <div class="setting-info">
+            <span class="setting-name">Progressive Web App &amp; Offline Cache</span>
+            <span class="setting-desc" id="pwaStatusDesc">Service Worker registered. Core app available offline.</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button type="button" class="btn-secondary-sm" id="pwaInstallBtn" style="display: none;">Install App</button>
+            <span class="status-badge-inline status-online" id="pwaStatusBadge">Active</span>
+          </div>
+        </div>
+
+        <!-- ── Interface Appearance & Visual Accessibility ── -->
+        <div class="settings-card-group" id="appearanceSettingsGroup">
+          <div class="settings-group-header">
+            <div class="settings-group-title">
+              <span class="settings-icon">🎨</span>
+              <div>
+                <h4 class="settings-group-heading">Interface Appearance &amp; Visual Accessibility</h4>
+                <p class="settings-group-sub">Adjust surface transparency and translucency for reading comfort while keeping text contrast 100% sharp.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Surface Opacity Slider -->
+          <div class="setting-item surface-opacity-item">
+            <div class="setting-info" style="width: 100%;">
+              <div class="opacity-label-row">
+                <label for="surfaceOpacitySlider" class="setting-name">Surface Transparency &amp; Opacity</label>
+                <div class="opacity-value-badge" id="surfaceOpacityBadge">
+                  <span id="surfaceOpacityVal">100</span>%
+                </div>
+              </div>
+              <span class="setting-desc">Adjust background surface opacity from 20% (translucent) to 100% (solid). Text, icons, and interactive buttons remain fully opaque for maximum readability.</span>
+
+              <div class="opacity-slider-row">
+                <span class="slider-bound-label">20% (Translucent)</span>
+                <input
+                  type="range"
+                  id="surfaceOpacitySlider"
+                  class="surface-opacity-slider"
+                  min="20"
+                  max="100"
+                  value="100"
+                  step="1"
+                  aria-label="Interface surface transparency percentage"
+                >
+                <span class="slider-bound-label">100% (Solid)</span>
+              </div>
+
+              <!-- Application Appearance Live Preview -->
+              <div class="opacity-preview-box" id="opacityPreviewBox" aria-label="Visual accessibility live preview of application surfaces">
+                <div class="preview-backdrop-grid"></div>
+                <div class="preview-app-mock">
+                  <div class="preview-user-bubble">
+                    <span>Explain Binary Search Tree complexity</span>
+                  </div>
+                  <div class="preview-card preview-ai-bubble" id="previewCardSample">
+                    <div class="preview-card-header">
+                      <span class="preview-badge">✨ StudyMate AI Response</span>
+                      <span class="preview-tag">High Contrast</span>
+                    </div>
+                    <p class="preview-text">Average lookup complexity is <code>O(log n)</code>. Text, icons, and code remain 100% opaque and sharp across all surfaces.</p>
+                    <div class="preview-code-block">
+                      <code>int search(Node* root, int key);</code>
+                    </div>
+                    <div class="preview-card-footer">
+                      <span class="preview-subtext">Sidebar • Panels • Modals • Cards</span>
+                      <button type="button" class="preview-sample-btn" tabindex="-1">Copy Code</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reset to Default Button & Quick Actions -->
+              <div class="opacity-actions-row">
+                <span class="opacity-hint-note">Stored locally in browser • Fully operational offline.</span>
+                <button type="button" class="btn-secondary-sm" id="resetOpacityBtn" title="Reset interface transparency to default 100% solid">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                    <path d="M3 3v5h5"></path>
+                  </svg>
+                  <span>Reset to Default</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Offline Local Generative AI (WebLLM & WebGPU) ── -->
+        <div class="settings-card-group" id="localAiSettingsGroup">
+          <div class="settings-group-header">
+            <div class="settings-group-title">
+              <span class="settings-icon">⚡</span>
+              <div>
+                <h4 class="settings-group-heading">Offline Generative AI (WebLLM &amp; WebGPU)</h4>
+                <p class="settings-group-sub">Run generative AI models on-device with zero internet connection.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Engine Preference -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">AI Engine Routing</span>
+              <span class="setting-desc">Auto uses Gemini when online and seamlessly falls back to Local AI offline.</span>
+            </div>
+            <select class="settings-select" id="enginePrefSelect" aria-label="Select AI engine routing">
+              <option value="auto" selected>Auto (Gemini online, Local AI offline)</option>
+              <option value="local">Local AI (Always On-Device)</option>
+              <option value="gemini">Gemini AI (Cloud Only)</option>
+            </select>
+          </div>
+
+          <!-- WebGPU Compatibility -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">WebGPU Compatibility</span>
+              <span class="setting-desc" id="webgpuDesc">Detecting WebGPU hardware acceleration...</span>
+            </div>
+            <span class="status-badge-inline" id="webgpuBadge">Checking...</span>
+          </div>
+
+          <!-- Model Selection -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">Local AI Model</span>
+              <span class="setting-desc" id="modelSpecsDesc">Qwen2.5-Coder 1.5B (~980 MB, ~1.6 GB VRAM)</span>
+            </div>
+            <select class="settings-select" id="localModelSelect" aria-label="Select Local AI Model">
+              <option value="Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC" selected>Qwen2.5-Coder 1.5B (Recommended)</option>
+              <option value="Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-Coder 0.5B (Ultra-Light, ~390 MB)</option>
+              <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2 1B Instruct (~700 MB)</option>
+            </select>
+          </div>
+
+          <!-- Model Download & Cache Status -->
+          <div class="setting-item local-model-mgmt">
+            <div class="setting-info" style="width: 100%;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <span class="setting-name">Model Cache &amp; Initialization</span>
+                <span class="status-badge-inline" id="modelCacheBadge">Checking...</span>
+              </div>
+              <span class="setting-desc" id="modelCacheStatusDesc">Status: Checking browser cache...</span>
+
+              <!-- Download progress bar -->
+              <div class="local-progress-wrap" id="localAiProgressWrap" hidden>
+                <div class="local-progress-bar">
+                  <div class="local-progress-fill" id="localAiProgressFill" style="width: 0%;"></div>
+                </div>
+                <div class="local-progress-meta">
+                  <span class="local-progress-text" id="localAiProgressPercent">0%</span>
+                  <span class="local-progress-info" id="localAiProgressText">Downloading model...</span>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="model-action-buttons">
+                <button type="button" class="btn-primary-sm" id="downloadModelBtn">Download Model</button>
+                <button type="button" class="btn-secondary-sm" id="testInferenceBtn" style="display: none;">Test Local AI</button>
+                <button type="button" class="btn-danger-sm" id="deleteModelBtn" style="display: none;">Delete Local Model</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Persistent Storage Status -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">Browser Storage Persistence</span>
+              <span class="setting-desc" id="storagePersistenceDesc">Protects downloaded AI models against automatic browser eviction.</span>
+            </div>
+            <span class="status-badge-inline status-online" id="storagePersistenceBadge">Checking...</span>
+          </div>
+
+          <!-- Offline Image Generation Architecture (Part 6) -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">Offline Image Architecture</span>
+              <span class="setting-desc">WebLLM is an LLM text engine. Offline diffusion (Web-SD) requires 4GB+ VRAM &amp; explicit ~2GB model download.</span>
+            </div>
+            <span class="status-badge-inline" id="offlineImageBadge" style="background: rgba(147, 51, 234, 0.15); color: #a855f7; border: 1px solid rgba(147, 51, 234, 0.3);">Web-SD Ready</span>
+          </div>
+
+          <!-- Image Generation Performance Mode (Phase 5) -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">Image Generation Mode</span>
+              <span class="setting-desc">Fast Mode optimizes for low latency (512px preview, minimal thinking). Quality Mode renders 1K HD visuals.</span>
+            </div>
+            <select class="form-select form-select-sm" id="settingsImageModeSelect" aria-label="Default image generation mode" style="width: auto; min-width: 140px;">
+              <option value="fast" selected>⚡ Fast Mode (512px)</option>
+              <option value="quality">✨ Quality Mode (1K)</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div class="modal-actions">
@@ -1303,6 +1697,7 @@
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <!-- Application Logic -->
+  <script src="/js/jszip.min.js"></script>
   <script src="/js/chat.js"></script>
 
 </body>

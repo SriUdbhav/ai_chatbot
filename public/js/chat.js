@@ -24,132 +24,443 @@
 /* ─────────────────────────────────────────────────────────────────
    CONSTANTS & CONFIGURATION
 ───────────────────────────────────────────────────────────────── */
-const STORAGE_KEY           = 'studyai_conversations_v1';
-const ACTIVE_CONV_KEY       = 'studyai_active_id_v1';
-const LEARNING_MODE_KEY     = 'studyai_learning_mode_v1';
-const MAX_CONVERSATIONS     = 50;
+const STORAGE_KEY = 'studyai_conversations_v1';
+const ACTIVE_CONV_KEY = 'studyai_active_id_v1';
+const LEARNING_MODE_KEY = 'studyai_learning_mode_v1';
+const OPACITY_STORAGE_KEY = 'studymate_surface_opacity';
+const MAX_CONVERSATIONS = 50;
 const MAX_MESSAGES_PER_CONV = 100;
-const MAX_MESSAGE_LENGTH    = 4000;
-const API_URL               = window.APP_CONFIG?.chatApiUrl ?? '/api/chat';
-const TOOLS_API_URL         = window.APP_CONFIG?.toolsApiUrl ?? '/api/tools';
-const API_KEY_CONFIGURED    = window.APP_CONFIG?.apiKeyConfigured ?? false;
+const MAX_MESSAGE_LENGTH = 4000;
+const API_URL = window.APP_CONFIG?.chatApiUrl ?? '/api/chat';
+const TOOLS_API_URL = window.APP_CONFIG?.toolsApiUrl ?? '/api/tools';
+const API_KEY_CONFIGURED = window.APP_CONFIG?.apiKeyConfigured ?? false;
 
 /* ─────────────────────────────────────────────────────────────────
    APPLICATION STATE
 ───────────────────────────────────────────────────────────────── */
 const state = {
-  conversations:    {},   // { [id]: Conversation }
-  activeId:         null, // string | null (null = new unsaved chat state)
-  isWaiting:        false,// true while waiting for server response
-  isStreaming:      false,// true while typewriter streaming is active
+  conversations: {},   // { [id]: Conversation }
+  activeId: null, // string | null (null = new unsaved chat state)
+  isWaiting: false,// true while waiting for server response
+  isStreaming: false,// true while typewriter streaming is active
   stopStreamingRequested: false, // true when user clicks stop button
-  editingId:        null, // conversation ID currently undergoing inline rename
-  pendingDeleteId:  null, // conversation ID pending deletion modal confirmation
+  editingId: null, // conversation ID currently undergoing inline rename
+  pendingDeleteId: null, // conversation ID pending deletion modal confirmation
   storageAvailable: true, // set to false if localStorage is blocked or throws
-  learningMode:     'standard', // active study preference
-  activeQuiz:       null, // stores active quiz data and student answers
-  isListening:      false,// speech dictation active
+  learningMode: 'standard', // active study preference
+  activeQuiz: null, // stores active quiz data and student answers
+  isListening: false,// speech dictation active
   speechRecognition: null,// Web Speech API instance
   currentSpeakingBtn: null, // current active TTS button
-  searchQuery:      '',   // topbar search query filter
-  pendingDeleteMode: null // 'single' | 'all'
+  searchQuery: '',   // topbar search query filter
+  pendingDeleteMode: null, // 'single' | 'all'
+  composerAttachments: [], // [{ id, file, filename, fileType, size, formattedSize, text, dataUrl, isExtracting, error }]
+  imageGenMode: localStorage.getItem('studymate_image_mode') || 'fast' // Phase 5: 'fast' | 'quality'
 };
+
+// Phase 4: Object URL lifecycle tracking to avoid repeated Base64 DOM repaint overhead
+const activeBlobUrls = new Set();
+function base64ToBlobUrl(base64, mimeType = 'image/jpeg') {
+  try {
+    const bin = atob(base64);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const blob = new Blob([u8], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    activeBlobUrls.add(url);
+    return url;
+  } catch (e) {
+    console.warn('[Image] Fallback to data URL:', e);
+    return `data:${mimeType};base64,${base64}`;
+  }
+}
+
+window.addEventListener('beforeunload', () => {
+  for (const u of activeBlobUrls) {
+    try { URL.revokeObjectURL(u); } catch (_) {}
+  }
+  activeBlobUrls.clear();
+});
 
 /* ─────────────────────────────────────────────────────────────────
    DOM REFERENCES
 ───────────────────────────────────────────────────────────────── */
-const sidebar            = document.getElementById('sidebar');
-const sidebarOverlay     = document.getElementById('sidebarOverlay');
-const sidebarCloseBtn    = document.getElementById('sidebarCloseBtn');
-const sidebarOpenBtn     = document.getElementById('sidebarOpenBtn');
-const newChatBtn         = document.getElementById('newChatBtn');
-const convoList          = document.getElementById('convoList');
-const convoEmpty         = document.getElementById('convoEmpty');
-const welcomeScreen      = document.getElementById('welcomeScreen');
-const messagesArea       = document.getElementById('messagesArea');
-const clearChatBtn       = document.getElementById('clearChatBtn');
-const chatForm           = document.getElementById('chatForm');
-const messageInput       = document.getElementById('messageInput');
-const sendBtn            = document.getElementById('sendBtn');
-const stopBtn            = document.getElementById('stopBtn');
-const micBtn             = document.getElementById('micBtn');
-const quickToolsBar      = document.getElementById('quickToolsBar');
-const topbarTitle        = document.getElementById('topbarTitle');
-const composerHint       = document.getElementById('composerHint');
-const studyModeSelect    = document.getElementById('studyModeSelect');
-const openToolsBtn       = document.getElementById('openToolsBtn');
-const deleteModal        = document.getElementById('deleteModal');
-const deleteModalTitle   = document.getElementById('deleteModalTitle');
-const deleteModalDesc    = document.getElementById('deleteModalDesc');
-const deleteModalCancel  = document.getElementById('deleteModalCancel');
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+const sidebarOpenBtn = document.getElementById('sidebarOpenBtn');
+const newChatBtn = document.getElementById('newChatBtn');
+const convoList = document.getElementById('convoList');
+const convoEmpty = document.getElementById('convoEmpty');
+const welcomeScreen = document.getElementById('welcomeScreen');
+const messagesArea = document.getElementById('messagesArea');
+const clearChatBtn = document.getElementById('clearChatBtn');
+const chatForm = document.getElementById('chatForm');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const stopBtn = document.getElementById('stopBtn');
+const attachBtn = document.getElementById('attachBtn');
+const attachmentMenu = document.getElementById('attachmentMenu');
+const composerAttachments = document.getElementById('composerAttachments');
+const composerFileInput = document.getElementById('composerFileInput');
+const micBtn = document.getElementById('micBtn');
+const quickToolsBar = document.getElementById('quickToolsBar');
+const topbarTitle = document.getElementById('topbarTitle');
+const composerHint = document.getElementById('composerHint');
+const studyModeSelect = document.getElementById('studyModeSelect');
+const openToolsBtn = document.getElementById('openToolsBtn');
+const deleteModal = document.getElementById('deleteModal');
+const deleteModalTitle = document.getElementById('deleteModalTitle');
+const deleteModalDesc = document.getElementById('deleteModalDesc');
+const deleteModalCancel = document.getElementById('deleteModalCancel');
 const deleteModalConfirm = document.getElementById('deleteModalConfirm');
-const toastContainer     = document.getElementById('toastContainer');
+const toastContainer = document.getElementById('toastContainer');
 const sidebarClearAllBtn = document.getElementById('sidebarClearAllBtn');
 
 // Topbar Search, Theme & Notification References
-const chatSearchInput     = document.getElementById('chatSearchInput');
-const themeToggleBtn      = document.getElementById('themeToggleBtn');
-const notifBtn            = document.getElementById('notifBtn');
-const notifBadge          = document.getElementById('notifBadge');
-const notifDropdown       = document.getElementById('notifDropdown');
-const notifClearBtn       = document.getElementById('notifClearBtn');
-const profileChip         = document.getElementById('profileChip');
-const THEME_STORAGE_KEY   = 'studymate_theme_v1';
+const chatSearchInput = document.getElementById('chatSearchInput');
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+const notifBtn = document.getElementById('notifBtn');
+const notifBadge = document.getElementById('notifBadge');
+const notifDropdown = document.getElementById('notifDropdown');
+const notifClearBtn = document.getElementById('notifClearBtn');
+const profileChip = document.getElementById('profileChip');
+const profileDropdown = document.getElementById('profileDropdown');
+const profileSettingsBtn = document.getElementById('profileSettingsBtn');
+const profileSavedBtn = document.getElementById('profileSavedBtn');
+const profilePlannerBtn = document.getElementById('profilePlannerBtn');
+const THEME_STORAGE_KEY = 'studymate_theme_v1';
 
 // Tools Modal References
-const toolsModal         = document.getElementById('toolsModal');
+const toolsModal = document.getElementById('toolsModal');
 const closeToolsModalBtn = document.getElementById('closeToolsModalBtn');
-const toolTabs           = document.querySelectorAll('.tool-tab');
-const toolPanes          = document.querySelectorAll('.tool-pane');
+const toolTabs = document.querySelectorAll('.tool-tab');
+const toolPanes = document.querySelectorAll('.tool-pane');
 
 // Tool Form References
-const explainForm        = document.getElementById('explainForm');
-const programmingForm    = document.getElementById('programmingForm');
-const summarizeForm      = document.getElementById('summarizeForm');
-const summarizeNotes     = document.getElementById('summarizeNotes');
-const notesCharCounter   = document.getElementById('notesCharCounter');
-const quizForm           = document.getElementById('quizForm');
+const explainForm = document.getElementById('explainForm');
+const programmingForm = document.getElementById('programmingForm');
+const summarizeForm = document.getElementById('summarizeForm');
+const summarizeNotes = document.getElementById('summarizeNotes');
+const notesCharCounter = document.getElementById('notesCharCounter');
+const quizForm = document.getElementById('quizForm');
 
 // Study Panel References
-const studyPanel            = document.getElementById('studyPanel');
-const studyPanelToggleBtn   = document.getElementById('studyPanelToggleBtn');
-const studyPanelCloseBtn    = document.getElementById('studyPanelCloseBtn');
-const studyPanelOverlay     = document.getElementById('studyPanelOverlay');
-const panelSessionTitle     = document.getElementById('panelSessionTitle');
-const panelMsgCount         = document.getElementById('panelMsgCount');
-const panelActiveModeBadge  = document.getElementById('panelActiveModeBadge');
-const quickNotepad          = document.getElementById('quickNotepad');
-const notepadStatus         = document.getElementById('notepadStatus');
+const studyPanel = document.getElementById('studyPanel');
+const studyPanelToggleBtn = document.getElementById('studyPanelToggleBtn');
+const studyPanelCloseBtn = document.getElementById('studyPanelCloseBtn');
+const studyPanelOverlay = document.getElementById('studyPanelOverlay');
+const panelSessionTitle = document.getElementById('panelSessionTitle');
+const panelMsgCount = document.getElementById('panelMsgCount');
+const panelActiveModeBadge = document.getElementById('panelActiveModeBadge');
+const quickNotepad = document.getElementById('quickNotepad');
+const notepadStatus = document.getElementById('notepadStatus');
 
 // Additional Feature Modals & Nav References
-const navHome               = document.getElementById('navHome');
-const navSubjectNotes       = document.getElementById('navSubjectNotes');
-const navPracticeQuiz       = document.getElementById('navPracticeQuiz');
-const navStudyPlanner       = document.getElementById('navStudyPlanner');
-const navSavedItems         = document.getElementById('navSavedItems');
-const navSettings           = document.getElementById('navSettings');
-const sidebarAllToolsLink   = document.getElementById('sidebarAllToolsLink');
+const navHome = document.getElementById('navHome');
+const navSubjectNotes = document.getElementById('navSubjectNotes');
+const navPracticeQuiz = document.getElementById('navPracticeQuiz');
+const navStudyPlanner = document.getElementById('navStudyPlanner');
+const navSavedItems = document.getElementById('navSavedItems');
+const navSettings = document.getElementById('navSettings');
+const sidebarAllToolsLink = document.getElementById('sidebarAllToolsLink');
 
-const plannerModal          = document.getElementById('plannerModal');
-const plannerCloseBtn       = document.getElementById('plannerCloseBtn');
-const plannerCancelBtn      = document.getElementById('plannerCancelBtn');
-const plannerGenerateBtn    = document.getElementById('plannerGenerateBtn');
-const plannerSubject        = document.getElementById('plannerSubject');
-const plannerDays           = document.getElementById('plannerDays');
-const plannerHours          = document.getElementById('plannerHours');
+const plannerModal = document.getElementById('plannerModal');
+const plannerCloseBtn = document.getElementById('plannerCloseBtn');
+const plannerCancelBtn = document.getElementById('plannerCancelBtn');
+const plannerGenerateBtn = document.getElementById('plannerGenerateBtn');
+const plannerSubject = document.getElementById('plannerSubject');
+const plannerDays = document.getElementById('plannerDays');
+const plannerHours = document.getElementById('plannerHours');
 
-const savedItemsModal       = document.getElementById('savedItemsModal');
-const savedCloseBtn         = document.getElementById('savedCloseBtn');
-const savedDismissBtn       = document.getElementById('savedDismissBtn');
-const savedItemsList        = document.getElementById('savedItemsList');
+const savedItemsModal = document.getElementById('savedItemsModal');
+const savedCloseBtn = document.getElementById('savedCloseBtn');
+const savedDismissBtn = document.getElementById('savedDismissBtn');
+const savedItemsList = document.getElementById('savedItemsList');
 
-const settingsModal         = document.getElementById('settingsModal');
-const settingsCloseBtn      = document.getElementById('settingsCloseBtn');
-const settingsDoneBtn       = document.getElementById('settingsDoneBtn');
-const clearAllHistoryBtn    = document.getElementById('clearAllHistoryBtn');
+const settingsModal = document.getElementById('settingsModal');
+const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+const settingsDoneBtn = document.getElementById('settingsDoneBtn');
+const clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
 
-const SAVED_ITEMS_KEY       = 'studyai_saved_items_v1';
-const QUICK_NOTES_KEY       = 'studyai_quick_notes_v1';
+const SAVED_ITEMS_KEY = 'studyai_saved_items_v1';
+const QUICK_NOTES_KEY = 'studyai_quick_notes_v1';
+
+// ── Media Storage (IndexedDB for Generated Images — Part 7) ──────────────────
+const imageCache = new Map();
+
+const MediaDB = {
+  dbPromise: null,
+  getDB() {
+    if (!this.dbPromise) {
+      this.dbPromise = new Promise((resolve) => {
+        if (typeof window === 'undefined' || !('indexedDB' in window)) {
+          return resolve(null);
+        }
+        try {
+          const req = indexedDB.open('StudyMate_MediaDB', 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('generated_images')) {
+              db.createObjectStore('generated_images', { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = (e) => resolve(e.target.result);
+          req.onerror = (e) => {
+            console.warn('[MediaDB] Could not open IndexedDB:', e);
+            resolve(null);
+          };
+        } catch (err) {
+          console.warn('[MediaDB] IndexedDB exception:', err);
+          resolve(null);
+        }
+      });
+    }
+    return this.dbPromise;
+  },
+
+  async saveImage(id, dataUrl, mimeType, prompt, engine) {
+    if (id && dataUrl) {
+      imageCache.set(id, dataUrl);
+    }
+    try {
+      const db = await this.getDB();
+      if (!db) return false;
+      return new Promise((resolve) => {
+        const tx = db.transaction('generated_images', 'readwrite');
+        const store = tx.objectStore('generated_images');
+        store.put({
+          id,
+          dataUrl,
+          mimeType: mimeType || 'image/png',
+          prompt: prompt || '',
+          engine: engine || 'Gemini Image',
+          createdAt: Date.now(),
+        });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch (err) {
+      console.warn('[MediaDB] Failed to save image:', err);
+      return false;
+    }
+  },
+
+  async getImage(id) {
+    if (imageCache.has(id)) {
+      return { id, dataUrl: imageCache.get(id) };
+    }
+    try {
+      const db = await this.getDB();
+      if (!db) return null;
+      return new Promise((resolve) => {
+        const tx = db.transaction('generated_images', 'readonly');
+        const store = tx.objectStore('generated_images');
+        const req = store.get(id);
+        req.onsuccess = () => {
+          if (req.result && req.result.dataUrl) {
+            imageCache.set(id, req.result.dataUrl);
+          }
+          resolve(req.result || null);
+        };
+        req.onerror = () => resolve(null);
+      });
+    } catch (err) {
+      console.warn('[MediaDB] Failed to get image:', err);
+      return null;
+    }
+  },
+
+  async deleteImage(id) {
+    imageCache.delete(id);
+    try {
+      const db = await this.getDB();
+      if (!db) return false;
+      return new Promise((resolve) => {
+        const tx = db.transaction('generated_images', 'readwrite');
+        const store = tx.objectStore('generated_images');
+        store.delete(id);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch (err) {
+      console.warn('[MediaDB] Failed to delete image:', err);
+      return false;
+    }
+  }
+};
+
+async function copyImageToClipboard(imgId, btn) {
+  let dataUrl = imageCache.get(imgId);
+  if (!dataUrl) {
+    const record = await MediaDB.getImage(imgId);
+    dataUrl = record?.dataUrl;
+  }
+
+  if (!dataUrl) {
+    showToast('Image data not found.', 'warn');
+    return;
+  }
+
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const pngBlob = blob.type === 'image/png' ? blob : new Blob([blob], { type: 'image/png' });
+
+    if (navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': pngBlob })
+      ]);
+      if (btn) {
+        btn.classList.add('copied');
+        const orig = btn.innerHTML;
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg> <span>Copied!</span>`;
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = orig;
+        }, 2000);
+      }
+      showToast('Image copied to clipboard!', 'success');
+      return;
+    }
+  } catch (err) {
+    console.warn('[Clipboard] Direct PNG copy failed, attempting fallback:', err);
+  }
+
+  try {
+    await navigator.clipboard.writeText(dataUrl);
+    showToast('Copied image data URL to clipboard.', 'info');
+  } catch (e2) {
+    showToast('Clipboard access denied by browser.', 'warn');
+  }
+}
+
+async function downloadImage(imgId, prompt) {
+  let dataUrl = imageCache.get(imgId);
+  if (!dataUrl) {
+    const record = await MediaDB.getImage(imgId);
+    dataUrl = record?.dataUrl;
+  }
+
+  if (!dataUrl) {
+    showToast('Image data not found.', 'warn');
+    return;
+  }
+
+  try {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    const safePrompt = (prompt || 'studymate-image')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .slice(0, 32)
+      .replace(/^-+|-+$/g, '');
+    a.download = `studymate-${safePrompt || 'ai'}-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('Image download started!', 'success');
+  } catch (err) {
+    console.warn('Download error:', err);
+    showToast('Failed to trigger download.', 'error');
+  }
+}
+
+// ── Local AI & WebLLM References ──────────────────────────────────────────────
+const engineIndicatorPill = document.getElementById('engineIndicatorPill');
+const engineIndicatorDot = document.getElementById('engineIndicatorDot');
+const engineIndicatorText = document.getElementById('engineIndicatorText');
+const enginePrefSelect = document.getElementById('enginePrefSelect');
+const webgpuBadge = document.getElementById('webgpuBadge');
+const webgpuDesc = document.getElementById('webgpuDesc');
+const localModelSelect = document.getElementById('localModelSelect');
+const modelSpecsDesc = document.getElementById('modelSpecsDesc');
+const modelCacheBadge = document.getElementById('modelCacheBadge');
+const modelCacheStatusDesc = document.getElementById('modelCacheStatusDesc');
+const localAiProgressWrap = document.getElementById('localAiProgressWrap');
+const localAiProgressFill = document.getElementById('localAiProgressFill');
+const localAiProgressPercent = document.getElementById('localAiProgressPercent');
+const localAiProgressText = document.getElementById('localAiProgressText');
+const downloadModelBtn = document.getElementById('downloadModelBtn');
+const deleteModelBtn = document.getElementById('deleteModelBtn');
+const testInferenceBtn = document.getElementById('testInferenceBtn');
+const storagePersistenceBadge = document.getElementById('storagePersistenceBadge');
+const storagePersistenceDesc = document.getElementById('storagePersistenceDesc');
+
+// Interface Appearance & Accessibility References
+const surfaceOpacitySlider = document.getElementById('surfaceOpacitySlider');
+const surfaceOpacityVal = document.getElementById('surfaceOpacityVal');
+const resetOpacityBtn = document.getElementById('resetOpacityBtn');
+const previewCardSample = document.getElementById('previewCardSample');
+
+let localAiModule = null;
+async function getLocalAI() {
+  if (!localAiModule) {
+    try {
+      localAiModule = await import('/js/local-ai.js');
+    } catch (err) {
+      console.warn('[LocalAI] Could not load local-ai module:', err);
+    }
+  }
+  return localAiModule;
+}
+
+async function updateEngineIndicator(forcedState, customLabel) {
+  if (!engineIndicatorPill || !engineIndicatorDot || !engineIndicatorText) return;
+
+  if (forcedState === 'downloading') {
+    engineIndicatorDot.className = 'engine-indicator-dot dot-blue';
+    engineIndicatorText.textContent = customLabel || 'Downloading Model';
+    return;
+  }
+  if (forcedState === 'initializing') {
+    engineIndicatorDot.className = 'engine-indicator-dot dot-amber';
+    engineIndicatorText.textContent = customLabel || 'Initializing Local AI';
+    return;
+  }
+  if (forcedState === 'running') {
+    engineIndicatorDot.className = 'engine-indicator-dot dot-purple';
+    engineIndicatorText.textContent = customLabel || 'Local AI (Generating)';
+    return;
+  }
+
+  const localAi = await getLocalAI();
+  const pref = localAi ? localAi.getEnginePreference() : 'auto';
+  const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+
+  if (pref === 'local') {
+    engineIndicatorDot.className = 'engine-indicator-dot dot-purple';
+    engineIndicatorText.textContent = 'Local AI (WebGPU)';
+    return;
+  }
+
+  if (pref === 'gemini') {
+    if (isOnline) {
+      engineIndicatorDot.className = 'engine-indicator-dot dot-green';
+      engineIndicatorText.textContent = 'Gemini AI';
+    } else {
+      engineIndicatorDot.className = 'engine-indicator-dot dot-amber';
+      engineIndicatorText.textContent = 'Gemini (Offline)';
+    }
+    return;
+  }
+
+  // Auto mode:
+  if (isOnline) {
+    engineIndicatorDot.className = 'engine-indicator-dot dot-green';
+    engineIndicatorText.textContent = 'Gemini AI';
+  } else {
+    const modelId = localAi ? localAi.getSelectedModelId() : null;
+    const isCached = localAi ? await localAi.isModelCached(modelId) : false;
+    if (isCached) {
+      engineIndicatorDot.className = 'engine-indicator-dot dot-purple';
+      engineIndicatorText.textContent = 'Local AI (Offline)';
+    } else {
+      engineIndicatorDot.className = 'engine-indicator-dot dot-amber';
+      engineIndicatorText.textContent = 'Offline (Setup AI)';
+    }
+  }
+}
 
 /* ─────────────────────────────────────────────────────────────────
    UTILITIES & FORMATTERS
@@ -320,13 +631,13 @@ function loadStoredConversations() {
           if (!content) return;
 
           messages.push({
-            id:        typeof msg.id === 'string' ? msg.id : generateId('msg'),
-            role:      role,
-            content:   content.slice(0, MAX_MESSAGE_LENGTH * 3),
+            id: typeof msg.id === 'string' ? msg.id : generateId('msg'),
+            role: role,
+            content: content.slice(0, MAX_MESSAGE_LENGTH * 3),
             timestamp: typeof msg.timestamp === 'number' ? msg.timestamp : Date.now(),
-            time:      typeof msg.time === 'string' ? msg.time : formatTime(),
-            isError:   Boolean(msg.isError),
-            quizData:  (msg.quizData && typeof msg.quizData === 'object') ? msg.quizData : null
+            time: typeof msg.time === 'string' ? msg.time : formatTime(),
+            isError: Boolean(msg.isError),
+            quizData: (msg.quizData && typeof msg.quizData === 'object') ? msg.quizData : null
           });
         });
       }
@@ -334,12 +645,12 @@ function loadStoredConversations() {
       const cappedMessages = messages.slice(-MAX_MESSAGES_PER_CONV);
 
       validConversations[item.id] = {
-        id:          item.id,
-        title:       title,
+        id: item.id,
+        title: title,
         customTitle: customTitle,
-        createdAt:   createdAt,
-        updatedAt:   updatedAt,
-        messages:    cappedMessages
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        messages: cappedMessages
       };
     });
 
@@ -399,22 +710,233 @@ function pruneOldestConversations(count = 3) {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   MARKDOWN & CODE RENDERING
+   LANGUAGE METADATA & SYNTAX HIGHLIGHTING (100% OFFLINE)
+───────────────────────────────────────────────────────────────── */
+function getLanguageMeta(rawLang) {
+  const lang = (rawLang || '').toLowerCase().trim();
+
+  if (!lang || lang === 'text' || lang === 'plain' || lang === 'txt') {
+    return { lang: 'text', display: 'Code' };
+  }
+
+  const map = {
+    c: { lang: 'c', display: 'C' },
+    'c++': { lang: 'cpp', display: 'C++' },
+    cpp: { lang: 'cpp', display: 'C++' },
+    'c#': { lang: 'csharp', display: 'C#' },
+    cs: { lang: 'csharp', display: 'C#' },
+    csharp: { lang: 'csharp', display: 'C#' },
+    java: { lang: 'java', display: 'Java' },
+    python: { lang: 'python', display: 'Python' },
+    py: { lang: 'python', display: 'Python' },
+    javascript: { lang: 'javascript', display: 'JavaScript' },
+    js: { lang: 'javascript', display: 'JavaScript' },
+    node: { lang: 'javascript', display: 'Node.js' },
+    nodejs: { lang: 'javascript', display: 'Node.js' },
+    typescript: { lang: 'typescript', display: 'TypeScript' },
+    ts: { lang: 'typescript', display: 'TypeScript' },
+    html: { lang: 'html', display: 'HTML' },
+    htm: { lang: 'html', display: 'HTML' },
+    xml: { lang: 'html', display: 'XML' },
+    svg: { lang: 'html', display: 'SVG' },
+    css: { lang: 'css', display: 'CSS' },
+    scss: { lang: 'css', display: 'SCSS' },
+    sass: { lang: 'css', display: 'Sass' },
+    less: { lang: 'css', display: 'Less' },
+    sql: { lang: 'sql', display: 'SQL' },
+    mysql: { lang: 'sql', display: 'MySQL' },
+    postgres: { lang: 'sql', display: 'PostgreSQL' },
+    postgresql: { lang: 'sql', display: 'PostgreSQL' },
+    sqlite: { lang: 'sql', display: 'SQLite' },
+    json: { lang: 'json', display: 'JSON' },
+    bash: { lang: 'bash', display: 'Bash' },
+    sh: { lang: 'bash', display: 'Shell' },
+    shell: { lang: 'bash', display: 'Shell' },
+    zsh: { lang: 'bash', display: 'Zsh' },
+    rust: { lang: 'rust', display: 'Rust' },
+    rs: { lang: 'rust', display: 'Rust' },
+    go: { lang: 'go', display: 'Go' },
+    golang: { lang: 'go', display: 'Go' },
+    php: { lang: 'php', display: 'PHP' },
+    ruby: { lang: 'ruby', display: 'Ruby' },
+    rb: { lang: 'ruby', display: 'Ruby' },
+    kotlin: { lang: 'java', display: 'Kotlin' },
+    kt: { lang: 'java', display: 'Kotlin' },
+    swift: { lang: 'csharp', display: 'Swift' },
+    r: { lang: 'python', display: 'R' },
+    yaml: { lang: 'yaml', display: 'YAML' },
+    yml: { lang: 'yaml', display: 'YAML' },
+    markdown: { lang: 'markdown', display: 'Markdown' },
+    md: { lang: 'markdown', display: 'Markdown' },
+    dockerfile: { lang: 'bash', display: 'Dockerfile' }
+  };
+
+  if (map[lang]) {
+    return map[lang];
+  }
+
+  const displayTitle = lang.charAt(0).toUpperCase() + lang.slice(1);
+  return { lang, display: displayTitle };
+}
+
+function highlightCode(rawCode, rawLang) {
+  if (!rawCode) return '';
+  const lang = (rawLang || '').toLowerCase().trim();
+
+  let tokenPattern = null;
+
+  if (lang === 'c' || lang === 'cpp' || lang === 'c++') {
+    tokenPattern = [
+      { type: 'comment', regex: /\/\/[^\n]*|\/\*[\s\S]*?\*\//y },
+      { type: 'preprocessor', regex: /#\s*(?:include|define|ifdef|ifndef|endif|if|elif|else|pragma|undef)\b[^\n]*/y },
+      { type: 'string', regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/y },
+      { type: 'keyword', regex: /\b(?:auto|break|case|char|const|continue|default|do|double|else|enum|extern|float|for|goto|if|inline|int|long|register|restrict|return|short|signed|sizeof|static|struct|switch|typedef|union|unsigned|void|volatile|while|_Bool|_Complex|_Imaginary|bool|catch|class|constexpr|delete|export|false|friend|mutable|namespace|new|noexcept|nullptr|operator|private|protected|public|template|this|throw|true|try|typename|using|virtual|override)\b/y },
+      { type: 'type', regex: /\b(?:std|cin|cout|cerr|endl|string|vector|map|set|list|pair|unordered_map|unordered_set|size_t|uint8_t|uint16_t|uint32_t|uint64_t|int8_t|int16_t|int32_t|int64_t|NULL|FILE)\b/y },
+      { type: 'function', regex: /\b[a-zA-Z_]\w*(?=\s*\()/y },
+      { type: 'number', regex: /\b0x[0-9a-fA-F]+\b|\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFlLuU]*\b/y },
+      { type: 'operator', regex: /[-+*\/%=<>!&|^~?:;.,]/y }
+    ];
+  } else if (lang === 'java') {
+    tokenPattern = [
+      { type: 'comment', regex: /\/\/[^\n]*|\/\*[\s\S]*?\*\//y },
+      { type: 'decorator', regex: /@[a-zA-Z_]\w*/y },
+      { type: 'string', regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/y },
+      { type: 'keyword', regex: /\b(?:abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|void|volatile|while|var|record|yield|sealed|permits)\b/y },
+      { type: 'type', regex: /\b(?:String|System|Object|Class|Math|Integer|Double|Float|Long|Short|Byte|Boolean|Character|List|ArrayList|LinkedList|Map|HashMap|TreeMap|Set|HashSet|TreeSet|Arrays|Collections|Optional|Scanner|PrintStream|Exception|RuntimeException|Throwable|Override|Deprecated|SuppressWarnings)\b/y },
+      { type: 'builtin', regex: /\b(?:true|false|null)\b/y },
+      { type: 'function', regex: /\b[a-zA-Z_]\w*(?=\s*\()/y },
+      { type: 'number', regex: /\b0x[0-9a-fA-F]+[lL]?\b|\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFdDlL]?\b/y },
+      { type: 'operator', regex: /[-+*\/%=<>!&|^~?:;.,]/y }
+    ];
+  } else if (lang === 'python' || lang === 'py') {
+    tokenPattern = [
+      { type: 'comment', regex: /#[^\n]*/y },
+      { type: 'string', regex: /"""[\s\S]*?"""|'''[\s\S]*?'''|f?"(?:\\.|[^"\\])*"|f?'(?:\\.|[^'\\])*'|r"(?:\\.|[^"\\])*"|r'(?:\\.|[^'\\])*'/y },
+      { type: 'decorator', regex: /@[a-zA-Z_]\w*/y },
+      { type: 'keyword', regex: /\b(?:and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield|match|case)\b/y },
+      { type: 'builtin', regex: /\b(?:True|False|None|self|cls|int|float|str|bool|list|dict|set|tuple|range|print|len|open|input|sum|min|max|enumerate|zip|map|filter|type|isinstance|super|any|all|sorted|reversed)\b/y },
+      { type: 'function', regex: /\b[a-zA-Z_]\w*(?=\s*\()/y },
+      { type: 'number', regex: /\b0x[0-9a-fA-F]+\b|\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/y },
+      { type: 'operator', regex: /[-+*\/%=<>!&|^~?:;.,]/y }
+    ];
+  } else if (lang === 'javascript' || lang === 'js' || lang === 'typescript' || lang === 'ts' || lang === 'node') {
+    tokenPattern = [
+      { type: 'comment', regex: /\/\/[^\n]*|\/\*[\s\S]*?\*\//y },
+      { type: 'string', regex: /`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/y },
+      { type: 'keyword', regex: /\b(?:async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|finally|for|function|if|import|in|instanceof|let|new|return|super|switch|this|throw|try|typeof|var|void|while|with|yield|interface|type|implements|declare|namespace|as|from|of)\b/y },
+      { type: 'builtin', regex: /\b(?:true|false|null|undefined|NaN|Infinity|console|window|document|process|module|exports|require|Promise|Array|Object|String|Number|Boolean|Function|Symbol|Map|Set|WeakMap|WeakSet|JSON|Math|Date|RegExp|Error)\b/y },
+      { type: 'function', regex: /\b[a-zA-Z_$][\w$]*(?=\s*\()/y },
+      { type: 'number', regex: /\b0x[0-9a-fA-F]+\b|\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/y },
+      { type: 'operator', regex: /[-+*\/%=<>!&|^~?:;.,]/y }
+    ];
+  } else if (lang === 'html' || lang === 'xml' || lang === 'svg') {
+    tokenPattern = [
+      { type: 'comment', regex: /<!--[\s\S]*?-->/y },
+      { type: 'doctype', regex: /<!DOCTYPE[^>]*>/iy },
+      { type: 'tag', regex: /<\/?[a-zA-Z0-9:-]+|\/?>/y },
+      { type: 'attr', regex: /\b[a-zA-Z0-9:-]+(?=\s*=)/y },
+      { type: 'string', regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/y },
+      { type: 'operator', regex: /=/y }
+    ];
+  } else if (lang === 'css' || lang === 'scss' || lang === 'less') {
+    tokenPattern = [
+      { type: 'comment', regex: /\/\*[\s\S]*?\*\//y },
+      { type: 'string', regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/y },
+      { type: 'at-rule', regex: /@[a-zA-Z-]+/y },
+      { type: 'color', regex: /#[0-9a-fA-F]{3,8}\b/y },
+      { type: 'property', regex: /\b[a-zA-Z-]+(?=\s*:)/y },
+      { type: 'unit', regex: /\b\d+(?:\.\d+)?(?:px|rem|em|vh|vw|%|s|ms|deg|fr|ch)\b/y },
+      { type: 'important', regex: /!important\b/y },
+      { type: 'number', regex: /\b\d+(?:\.\d+)?\b/y },
+      { type: 'operator', regex: /[:;{},()]/y }
+    ];
+  } else if (lang === 'sql') {
+    tokenPattern = [
+      { type: 'comment', regex: /--[^\n]*|\/\*[\s\S]*?\*\//y },
+      { type: 'string', regex: /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/y },
+      { type: 'keyword', regex: /\b(?:SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|DATABASE|INDEX|VIEW|DROP|ALTER|ADD|COLUMN|JOIN|INNER|LEFT|RIGHT|FULL|OUTER|CROSS|ON|AND|OR|NOT|IN|BETWEEN|LIKE|IS|NULL|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|AS|DISTINCT|UNION|ALL|EXISTS|CASE|WHEN|THEN|ELSE|END|PRIMARY|KEY|FOREIGN|REFERENCES|DEFAULT|CHECK|UNIQUE|AUTO_INCREMENT|ASC|DESC|CASCADE|TRUNCATE|GRANT|REVOKE|COMMIT|ROLLBACK|BEGIN|TRANSACTION)\b/iy },
+      { type: 'type', regex: /\b(?:INT|INTEGER|BIGINT|SMALLINT|TINYINT|VARCHAR|CHAR|TEXT|BLOB|DATE|DATETIME|TIMESTAMP|TIME|FLOAT|DOUBLE|DECIMAL|NUMERIC|BOOLEAN|BOOL)\b/iy },
+      { type: 'function', regex: /\b(?:COUNT|SUM|AVG|MIN|MAX|NOW|COALESCE|CONCAT|SUBSTRING|ROUND|UPPER|LOWER|IFNULL|LENGTH|TRIM)\b(?=\s*\()/iy },
+      { type: 'number', regex: /\b\d+(?:\.\d+)?\b/y },
+      { type: 'operator', regex: /[-+*\/%=<>!&|^~?:;.,()]/y }
+    ];
+  } else if (lang === 'json') {
+    tokenPattern = [
+      { type: 'property', regex: /"(?:\\.|[^"\\])*"(?=\s*:)/y },
+      { type: 'string', regex: /"(?:\\.|[^"\\])*"/y },
+      { type: 'builtin', regex: /\b(?:true|false|null)\b/y },
+      { type: 'number', regex: /-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/y },
+      { type: 'operator', regex: /[:{},\[\]]/y }
+    ];
+  } else if (lang === 'bash' || lang === 'sh' || lang === 'shell' || lang === 'zsh') {
+    tokenPattern = [
+      { type: 'comment', regex: /#[^\n]*/y },
+      { type: 'string', regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/y },
+      { type: 'variable', regex: /\$[a-zA-Z_]\w*|\$\{[^}]+\}/y },
+      { type: 'keyword', regex: /\b(?:echo|cd|ls|mkdir|rm|cp|mv|cat|grep|curl|wget|chmod|chown|git|npm|node|sudo|export|source|alias|if|then|else|elif|fi|for|in|do|done|while|case|esac|return|exit|pwd|find|sed|awk|tar|zip|unzip|touch|clear)\b/y },
+      { type: 'flag', regex: /(?:^|\s)(?:-[a-zA-Z0-9]+|--[a-zA-Z0-9_-]+)/y },
+      { type: 'operator', regex: /[|&;><=]/y }
+    ];
+  }
+
+  if (!tokenPattern) {
+    return escapeHtml(rawCode);
+  }
+
+  let index = 0;
+  const len = rawCode.length;
+  let result = '';
+
+  while (index < len) {
+    let matched = false;
+
+    for (let i = 0; i < tokenPattern.length; i++) {
+      const { type, regex } = tokenPattern[i];
+      regex.lastIndex = index;
+      const match = regex.exec(rawCode);
+      if (match && match.index === index) {
+        const text = match[0];
+        result += `<span class="tok-${type}">${escapeHtml(text)}</span>`;
+        index += text.length;
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched) {
+      result += escapeHtml(rawCode[index]);
+      index++;
+    }
+  }
+
+  return result;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   MARKDOWN & CHATGPT-STYLE CODE BLOCK RENDERING
 ───────────────────────────────────────────────────────────────── */
 function renderMarkdown(raw) {
   if (!raw) return '';
 
+  let text = raw;
+
+  // Handle in-progress streaming code blocks (unclosed triple backticks)
+  const fenceCount = (text.match(/```/g) || []).length;
+  if (fenceCount % 2 === 1) {
+    text = text + '\n```';
+  }
+
   const codeBlocks = [];
-  let text = raw.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+  text = text.replace(/```([a-zA-Z0-9_#+.-]*)[^\n]*\n?([\s\S]*?)```/g, (_, lang, code) => {
     const idx = codeBlocks.length;
-    codeBlocks.push({ lang: lang || 'text', code: code.trimEnd() });
-    return `\x00CODEBLOCK_${idx}\x00`;
+    codeBlocks.push({ lang: (lang || '').trim(), code: code });
+    return `\n\n\x00CODEBLOCK_${idx}\x00\n\n`;
   });
 
   // Escape HTML in the text body to prevent vanishing <tags> (e.g. <iostream>, <vector>, List<T>)
   text = text.replace(/&(?!amp;|lt;|gt;|quot;|#\d+;)/g, '&amp;')
-             .replace(/</g, '&lt;')
-             .replace(/>/g, '&gt;');
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
   // Headings
   text = text.replace(/^#{1,6}\s+(.+)$/gm, (_, content) => {
@@ -430,13 +952,13 @@ function renderMarkdown(raw) {
   text = text.replace(/_(.+?)_/g, '<em>$1</em>');
 
   // Inline code
-  text = text.replace(/`([^`]+)`/g, (_, code) => `<code>${code}</code>`);
+  text = text.replace(/`([^`\n]+)`/g, (_, code) => `<code>${code}</code>`);
 
   // Horizontal rule
   text = text.replace(/^(-{3,}|\*{3,}|_{3,})\s*$/gm, '<hr>');
 
   // Blockquote
-  text = text.replace(/^&gt;(.*)$/gm, '<blockquote>$1</blockquote>');
+  text = text.replace(/^&gt;\s?(.*)$/gm, '<blockquote>$1</blockquote>');
 
   // Unordered lists
   text = text.replace(/((?:^[*\-+] .+\n?)+)/gm, (block) => {
@@ -452,13 +974,26 @@ function renderMarkdown(raw) {
     return `<ol>${items}</ol>`;
   });
 
+  // LaTeX Block Math: $$...$$
+  text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+    return `<div class="katex-math-block" role="region" aria-label="Mathematical formula"><span class="math-content">${math.trim()}</span></div>`;
+  });
+
+  // LaTeX Inline Math: $...$ (ensuring not currency like $100 or $5.50)
+  text = text.replace(/(^|[^\$])\$([^\$\n\r]+?)\$(?!\$)/g, (match, prefix, math) => {
+    if (/^\s*\d+([.,]\d+)?\s*$/.test(math)) {
+      return match;
+    }
+    return `${prefix}<span class="katex-math-inline" role="math">${math.trim()}</span>`;
+  });
+
   // Tables
   text = text.replace(/((?:^\|.+\|\n?)+)/gm, (block) => {
     const rows = block.trim().split('\n').filter(r => r.trim());
     if (rows.length < 2) return block;
     const isSep = r => /^\|[-| :]+\|$/.test(r.trim());
     const headerRow = rows[0];
-    const sepIdx    = rows.findIndex(isSep);
+    const sepIdx = rows.findIndex(isSep);
     if (sepIdx < 0) return block;
     const bodyRows = rows.slice(sepIdx + 1);
     const cells = row => row.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
@@ -471,27 +1006,37 @@ function renderMarkdown(raw) {
   text = text.split(/\n{2,}/).map(block => {
     block = block.trim();
     if (!block) return '';
-    if (/^<(h[1-6]|ul|ol|li|blockquote|table|hr|pre)/.test(block) || block.startsWith('\x00CODEBLOCK')) return block;
+    if (/^<(h[1-6]|ul|ol|li|blockquote|table|hr|pre|div)/.test(block) || block.startsWith('\x00CODEBLOCK')) return block;
     return `<p>${block.replace(/\n/g, ' ')}</p>`;
   }).join('\n');
 
-  // Restore code blocks with styled wrappers and copy button
+  // Restore code blocks with ChatGPT-style headers, copy buttons, and syntax highlighting
   text = text.replace(/\x00CODEBLOCK_(\d+)\x00/g, (_, idx) => {
     const { lang, code } = codeBlocks[parseInt(idx, 10)];
-    const escaped = escapeHtml(code);
-    const safeId  = generateId('code');
-    return `<div class="code-block">
+    const meta = getLanguageMeta(lang);
+    const trimmedCode = code.replace(/^\n+|\n+$/g, '');
+    const highlighted = highlightCode(trimmedCode, meta.lang);
+    const safeId = (typeof generateId === 'function') ? generateId('code') : ('code_' + Math.random().toString(36).substr(2, 9));
+    const encodedRaw = encodeURIComponent(trimmedCode);
+
+    return `<div class="code-block" data-lang="${escapeHtml(meta.lang)}">
       <div class="code-block-header">
-        <span class="code-lang">${escapeHtml(lang)}</span>
-        <button class="code-copy-btn" data-code-id="${safeId}" aria-label="Copy code">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <div class="code-lang-label">
+          <svg class="code-lang-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          <span class="code-lang">${escapeHtml(meta.display)}</span>
+        </div>
+        <button class="code-copy-btn" data-code-id="${safeId}" type="button" aria-label="Copy ${escapeHtml(meta.display)} code" title="Copy code to clipboard">
+          <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
-          Copy
+          <span class="copy-btn-text">Copy</span>
         </button>
       </div>
-      <pre><code id="${safeId}">${escaped}</code></pre>
+      <pre class="code-block-pre"><code id="${safeId}" class="code-block-content language-${escapeHtml(meta.lang)}" data-raw-code="${encodedRaw}">${highlighted}</code></pre>
     </div>`;
   });
 
@@ -510,6 +1055,9 @@ function openSidebar() {
     sidebarOverlay.classList.add('visible', 'active');
   }
   document.body.style.overflow = 'hidden';
+  if (sidebarOpenBtn) {
+    sidebarOpenBtn.setAttribute('aria-expanded', 'true');
+  }
 }
 
 function closeSidebar() {
@@ -520,6 +1068,31 @@ function closeSidebar() {
     sidebarOverlay.classList.remove('visible', 'active');
   }
   document.body.style.overflow = '';
+  if (sidebarOpenBtn && window.innerWidth <= 900) {
+    sidebarOpenBtn.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function toggleSidebar() {
+  if (window.innerWidth > 900) {
+    const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+    document.documentElement.classList.toggle('sidebar-collapsed', isCollapsed);
+    if (sidebar) {
+      sidebar.classList.toggle('collapsed', isCollapsed);
+    }
+    try {
+      localStorage.setItem('studymate_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    } catch (e) { }
+    if (sidebarOpenBtn) {
+      sidebarOpenBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    }
+  } else {
+    if (sidebar && (sidebar.classList.contains('open') || sidebar.classList.contains('active'))) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  }
 }
 
 function openStudyPanel() {
@@ -541,14 +1114,18 @@ function closeStudyPanel() {
   }
 }
 
-if (sidebarOpenBtn)  sidebarOpenBtn.addEventListener('click', openSidebar);
+if (sidebarOpenBtn) sidebarOpenBtn.addEventListener('click', toggleSidebar);
 if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
-if (sidebarOverlay)  sidebarOverlay.addEventListener('click', closeSidebar);
+if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeSidebar();
     closeStudyPanel();
+    if (profileDropdown) {
+      profileDropdown.setAttribute('hidden', '');
+      if (profileChip) profileChip.setAttribute('aria-expanded', 'false');
+    }
   }
 });
 
@@ -556,17 +1133,17 @@ document.addEventListener('keydown', (e) => {
    CONVERSATION LIFECYCLE
 ───────────────────────────────────────────────────────────────── */
 function createNewConversation(initialPrompt = '') {
-  const id    = generateId('conv');
-  const now   = Date.now();
+  const id = generateId('conv');
+  const now = Date.now();
   const title = initialPrompt ? generateTitleFromPrompt(initialPrompt) : 'New Conversation';
 
   const conv = {
-    id:          id,
-    title:       title,
+    id: id,
+    title: title,
     customTitle: false,
-    createdAt:   now,
-    updatedAt:   now,
-    messages:    []
+    createdAt: now,
+    updatedAt: now,
+    messages: []
   };
 
   state.conversations[id] = conv;
@@ -751,7 +1328,7 @@ function executeDeleteAllConversations() {
   try {
     window.localStorage.removeItem(STORAGE_KEY);
     window.localStorage.removeItem(ACTIVE_CONV_KEY);
-  } catch (e) {}
+  } catch (e) { }
 
   startNewChat();
   showToast('All conversations deleted.', 'info');
@@ -1020,18 +1597,89 @@ function generateFollowupChipsHtml(msg) {
   return `<div class="followup-chips" aria-label="Suggested follow-up questions">${chipsHtml}</div>`;
 }
 
+function renderImageMessageHtml(msg) {
+  const safePrompt = escapeHtml(msg.prompt || 'Generated Visual');
+  const safeEngine = escapeHtml(msg.engine || 'Gemini Image');
+  const safeModel = escapeHtml(msg.model || 'gemini-3.1-flash-lite-image');
+
+  const tel = msg.telemetry;
+  const isFast = (msg.mode || tel?.mode) !== 'quality';
+  const modeLabel = isFast ? '⚡ Fast (512px)' : '✨ Quality (1K)';
+  const totalSec = tel?.totalMs ? (tel.totalMs / 1000).toFixed(1) + 's' : '';
+  const breakdownTooltip = tel ? `Total: ${(tel.totalMs/1000).toFixed(2)}s | API: ${(tel.apiMs/1000).toFixed(2)}s | Server: ${(tel.backendTotalMs/1000).toFixed(2)}s | Transfer: ${(tel.transferMs/1000).toFixed(2)}s | Render: ${tel.renderMs}ms` : 'Latency Telemetry';
+
+  return `
+    <div class="generated-image-card" data-img-id="${msg.imageId}">
+      <div class="image-card-header">
+        <div class="image-card-engine-badge">
+          <span class="engine-badge-icon">🎨</span>
+          <span>${safeEngine}</span>
+        </div>
+        <div class="image-card-telemetry" title="${escapeHtml(breakdownTooltip)}">
+          <span class="telemetry-pill">${modeLabel}</span>
+          ${totalSec ? `<span class="telemetry-time">${totalSec}</span>` : ''}
+        </div>
+        <span class="image-card-model">${safeModel}</span>
+      </div>
+      <div class="image-card-preview-wrap">
+        <div class="image-skeleton" id="skeleton_${msg.imageId}">
+          <div class="skeleton-shimmer"></div>
+          <div class="skeleton-text">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="spin-icon"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+            Generating visual rendering…
+          </div>
+        </div>
+        <img class="generated-img" id="img_${msg.imageId}" alt="${safePrompt}" style="display:none;" />
+      </div>
+      <div class="image-card-caption">
+        <div class="image-prompt-label">Prompt</div>
+        <p class="image-prompt-text">${safePrompt}</p>
+      </div>
+      <div class="image-card-actions">
+        <button type="button" class="img-action-btn copy-img-btn" data-img-id="${msg.imageId}" title="Copy Image to clipboard">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <span>Copy Image</span>
+        </button>
+        <button type="button" class="img-action-btn download-img-btn" data-img-id="${msg.imageId}" data-prompt="${safePrompt}" title="Download Image as PNG">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Download</span>
+        </button>
+        <button type="button" class="img-action-btn regen-img-btn" data-prompt="${safePrompt}" title="Regenerate this image">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>Regenerate</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function buildMessageEl(msg) {
   const row = document.createElement('div');
   row.className = 'msg-row';
   row.dataset.msgId = msg.id;
 
-  const isUser      = msg.role === 'user';
+  const isUser = msg.role === 'user';
   const bubbleClass = isUser ? 'user-bubble' : (msg.isError ? 'ai-bubble error-bubble' : 'ai-bubble');
   const senderLabel = isUser ? 'You' : 'StudyMate AI';
 
   let contentHtml = '';
   if (isUser) {
-    contentHtml = renderMarkdown(msg.content);
+    let attHtml = '';
+    if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+      attHtml = `<div class="msg-attachments-wrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">` +
+        msg.attachments.map(a => `
+          <span class="user-attachment-pill" style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,0.22);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.3);">
+            <span>${getAttachmentIcon(a.fileType)}</span>
+            <span>${escapeHtml(a.filename)}</span>
+            ${a.formattedSize ? `<span style="opacity:0.85;">(${escapeHtml(a.formattedSize)})</span>` : ''}
+          </span>
+        `).join('') + `</div>`;
+    }
+    contentHtml = attHtml + renderMarkdown(msg.content);
+  } else if (msg.type === 'image') {
+    contentHtml = renderImageMessageHtml(msg);
+  } else if (msg.rawHtml) {
+    contentHtml = msg.content;
   } else if (msg.quizData) {
     contentHtml = renderQuizMessageHtml(msg);
   } else {
@@ -1050,7 +1698,7 @@ function buildMessageEl(msg) {
       </button>
     </div>` : '';
 
-  const aiActionsHtml = !isUser && !msg.quizData ? `
+  const aiActionsHtml = !isUser && !msg.quizData && !msg.rawHtml && msg.type !== 'image' ? `
     <div class="msg-actions">
       <button class="msg-action-btn copy-msg-btn" data-msg-id="${msg.id}" aria-label="Copy response" title="Copy response">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -1058,6 +1706,16 @@ function buildMessageEl(msg) {
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
         </svg>
         Copy
+      </button>
+      <button class="msg-action-btn feedback-like-btn ${msg.feedback === 'like' ? 'active-like' : ''}" data-msg-id="${msg.id}" aria-label="Helpful response" title="Helpful response">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+        </svg>
+      </button>
+      <button class="msg-action-btn feedback-dislike-btn ${msg.feedback === 'dislike' ? 'active-dislike' : ''}" data-msg-id="${msg.id}" aria-label="Not helpful response" title="Not helpful response">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
+        </svg>
       </button>
       <button class="msg-action-btn bookmark-msg-btn" data-msg-id="${msg.id}" aria-label="Bookmark response" title="Save to bookmarks">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -1093,6 +1751,26 @@ function buildMessageEl(msg) {
     ${aiActionsHtml}
     ${generateFollowupChipsHtml(msg)}
   `;
+
+  if (msg.type === 'image' && msg.imageId) {
+    setTimeout(async () => {
+      const imgEl = row.querySelector(`#img_${msg.imageId}`);
+      const skelEl = row.querySelector(`#skeleton_${msg.imageId}`);
+      if (!imgEl) return;
+
+      let dataUrl = imageCache.get(msg.imageId);
+      if (!dataUrl) {
+        const rec = await MediaDB.getImage(msg.imageId);
+        dataUrl = rec?.dataUrl;
+      }
+
+      if (dataUrl) {
+        imgEl.src = dataUrl;
+        imgEl.style.display = 'block';
+        if (skelEl) skelEl.style.display = 'none';
+      }
+    }, 10);
+  }
 
   return row;
 }
@@ -1257,7 +1935,9 @@ function updateComposerButtons() {
     if (stopBtn) stopBtn.setAttribute('hidden', '');
     if (sendBtn) {
       sendBtn.style.display = 'flex';
-      sendBtn.disabled = messageInput.value.trim() === '';
+      const hasText = messageInput && messageInput.value.trim() !== '';
+      const hasAttachments = Array.isArray(state.composerAttachments) && state.composerAttachments.length > 0;
+      sendBtn.disabled = !hasText && !hasAttachments;
     }
   }
 }
@@ -1327,6 +2007,40 @@ function streamMessageToActive(msg, onComplete) {
     bubble.innerHTML = renderMarkdown(currentText) + '<span class="streaming-cursor"></span>';
     scrollToBottom();
   }, 22);
+}
+
+function updateStreamingMessage(msgId, partialText) {
+  const conv = state.conversations[state.activeId];
+  if (conv) {
+    const msg = conv.messages.find(m => m.id === msgId);
+    if (msg) msg.content = partialText;
+  }
+  const row = messagesArea.querySelector(`[data-msg-id="${msgId}"]`);
+  if (!row) return;
+  const bubble = row.querySelector('.msg-bubble');
+  if (bubble) {
+    bubble.innerHTML = renderMarkdown(partialText) + '<span class="streaming-cursor"></span>';
+    scrollToBottom();
+  }
+}
+
+function finalizeStreamedMessage(msgId, finalText) {
+  const conv = state.conversations[state.activeId];
+  if (conv) {
+    const msg = conv.messages.find(m => m.id === msgId);
+    if (msg) {
+      msg.content = finalText;
+      saveStoredConversations();
+      renderConvoList();
+    }
+  }
+  const row = messagesArea.querySelector(`[data-msg-id="${msgId}"]`);
+  if (!row) return;
+  const bubble = row.querySelector('.msg-bubble');
+  if (bubble) {
+    bubble.innerHTML = renderMarkdown(finalText);
+    scrollToBottom();
+  }
 }
 
 function appendMessageToActive(msg) {
@@ -1406,8 +2120,36 @@ function removeLoading() {
    COPY HELPERS
 ───────────────────────────────────────────────────────────────── */
 async function copyToClipboard(text, btn, label) {
-  try {
-    await navigator.clipboard.writeText(text);
+  let copied = false;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch (e) {
+      console.warn('[Clipboard] Async writeText failed, using fallback:', e);
+    }
+  }
+
+  if (!copied) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (fallbackErr) {
+      console.warn('[Clipboard] Fallback execCommand failed:', fallbackErr);
+    }
+  }
+
+  if (btn) {
     const orig = btn.innerHTML;
     btn.classList.add('copied');
     btn.innerHTML = label;
@@ -1415,15 +2157,10 @@ async function copyToClipboard(text, btn, label) {
       btn.classList.remove('copied');
       btn.innerHTML = orig;
     }, 2000);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;opacity:0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    ta.remove();
-    showToast('Copied to clipboard.', 'success');
+  }
+
+  if (!copied && !btn) {
+    showToast('Unable to copy to clipboard.', 'warn');
   }
 }
 
@@ -1543,14 +2280,102 @@ messagesArea.addEventListener('click', async (e) => {
     return;
   }
 
+  // Like & Dislike Feedback Actions
+  const likeBtn = e.target.closest('.feedback-like-btn');
+  if (likeBtn) {
+    const msgId = likeBtn.dataset.msgId;
+    const conv = state.conversations[state.activeId];
+    const msg = conv?.messages.find(m => m.id === msgId);
+    if (msg) {
+      msg.feedback = msg.feedback === 'like' ? null : 'like';
+      likeBtn.classList.toggle('active-like', msg.feedback === 'like');
+      const row = likeBtn.closest('.msg-row');
+      const dislikeBtnEl = row?.querySelector('.feedback-dislike-btn');
+      if (dislikeBtnEl) dislikeBtnEl.classList.remove('active-dislike');
+      saveConversations();
+      showToast(msg.feedback === 'like' ? 'Marked response as helpful 👍' : 'Feedback cleared', 'info');
+    }
+    return;
+  }
+
+  const dislikeBtn = e.target.closest('.feedback-dislike-btn');
+  if (dislikeBtn) {
+    const msgId = dislikeBtn.dataset.msgId;
+    const conv = state.conversations[state.activeId];
+    const msg = conv?.messages.find(m => m.id === msgId);
+    if (msg) {
+      msg.feedback = msg.feedback === 'dislike' ? null : 'dislike';
+      dislikeBtn.classList.toggle('active-dislike', msg.feedback === 'dislike');
+      const row = dislikeBtn.closest('.msg-row');
+      const likeBtnEl = row?.querySelector('.feedback-like-btn');
+      if (likeBtnEl) likeBtnEl.classList.remove('active-like');
+      saveConversations();
+      showToast(msg.feedback === 'dislike' ? 'Feedback noted 👎' : 'Feedback cleared', 'info');
+    }
+    return;
+  }
+
+  // Image Card Actions (Copy, Download, Regenerate)
+  const copyImgBtn = e.target.closest('.copy-img-btn');
+  if (copyImgBtn) {
+    const imgId = copyImgBtn.dataset.imgId;
+    if (imgId) copyImageToClipboard(imgId, copyImgBtn);
+    return;
+  }
+
+  const downloadImgBtn = e.target.closest('.download-img-btn');
+  if (downloadImgBtn) {
+    const imgId = downloadImgBtn.dataset.imgId;
+    const prompt = downloadImgBtn.dataset.prompt;
+    if (imgId) downloadImage(imgId, prompt);
+    return;
+  }
+
+  const regenImgBtn = e.target.closest('.regen-img-btn');
+  if (regenImgBtn) {
+    const prompt = regenImgBtn.dataset.prompt;
+    if (prompt) {
+      showToast('🔄 Regenerating image...', 'info');
+      handleImageGeneration(prompt);
+    }
+    return;
+  }
+
   const codeCopyBtn = e.target.closest('.code-copy-btn');
   if (codeCopyBtn) {
     const codeId = codeCopyBtn.dataset.codeId;
-    const codeEl = document.getElementById(codeId);
+    let codeText = '';
+    const codeEl = codeId ? document.getElementById(codeId) : null;
     if (codeEl) {
+      if (codeEl.dataset.rawCode) {
+        try {
+          codeText = decodeURIComponent(codeEl.dataset.rawCode);
+        } catch {
+          codeText = codeEl.textContent;
+        }
+      } else {
+        codeText = codeEl.textContent;
+      }
+    } else {
+      const parentBlock = codeCopyBtn.closest('.code-block');
+      const innerCode = parentBlock ? parentBlock.querySelector('code') : null;
+      if (innerCode) {
+        if (innerCode.dataset.rawCode) {
+          try {
+            codeText = decodeURIComponent(innerCode.dataset.rawCode);
+          } catch {
+            codeText = innerCode.textContent;
+          }
+        } else {
+          codeText = innerCode.textContent;
+        }
+      }
+    }
+
+    if (codeText) {
       copyToClipboard(
-        codeEl.textContent, codeCopyBtn,
-        `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg> Copied!`
+        codeText, codeCopyBtn,
+        `<svg class="copy-icon check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg><span class="copy-btn-text">Copied!</span>`
       );
     }
     return;
@@ -1688,12 +2513,12 @@ messagesArea.addEventListener('click', async (e) => {
 
       try {
         const res = await fetch(`${TOOLS_API_URL}/quiz/evaluate`, {
-          method:  'POST',
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            question:      q.question,
-            sampleAnswer:  q.sampleAnswer,
-            keyPoints:     q.keyPoints,
+          body: JSON.stringify({
+            question: q.question,
+            sampleAnswer: q.sampleAnswer,
+            keyPoints: q.keyPoints,
             studentAnswer: studentAnswer
           })
         });
@@ -1732,6 +2557,49 @@ messagesArea.addEventListener('click', async (e) => {
   }
 });
 
+// Global delegated listener for code copy buttons outside messagesArea (e.g. Document Studio, Modals)
+document.addEventListener('click', (e) => {
+  if (messagesArea && messagesArea.contains(e.target)) return;
+  const codeCopyBtn = e.target.closest('.code-copy-btn');
+  if (!codeCopyBtn) return;
+
+  const codeId = codeCopyBtn.dataset.codeId;
+  let codeText = '';
+  const codeEl = codeId ? document.getElementById(codeId) : null;
+  if (codeEl) {
+    if (codeEl.dataset.rawCode) {
+      try {
+        codeText = decodeURIComponent(codeEl.dataset.rawCode);
+      } catch {
+        codeText = codeEl.textContent;
+      }
+    } else {
+      codeText = codeEl.textContent;
+    }
+  } else {
+    const parentBlock = codeCopyBtn.closest('.code-block');
+    const innerCode = parentBlock ? parentBlock.querySelector('code') : null;
+    if (innerCode) {
+      if (innerCode.dataset.rawCode) {
+        try {
+          codeText = decodeURIComponent(innerCode.dataset.rawCode);
+        } catch {
+          codeText = innerCode.textContent;
+        }
+      } else {
+        codeText = innerCode.textContent;
+      }
+    }
+  }
+
+  if (codeText) {
+    copyToClipboard(
+      codeText, codeCopyBtn,
+      `<svg class="copy-icon check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg><span class="copy-btn-text">Copied!</span>`
+    );
+  }
+});
+
 messagesArea.addEventListener('input', (e) => {
   const shortInput = e.target.closest('.quiz-short-input');
   if (shortInput) {
@@ -1758,7 +2626,7 @@ function autoResize() {
 
 messageInput.addEventListener('input', () => {
   autoResize();
-  sendBtn.disabled = messageInput.value.trim() === '' || state.isWaiting;
+  updateComposerButtons();
 });
 
 messageInput.addEventListener('keydown', (e) => {
@@ -1769,20 +2637,781 @@ messageInput.addEventListener('keydown', (e) => {
 });
 
 /* ─────────────────────────────────────────────────────────────────
+   COMPOSER ATTACHMENTS & CLIENT EXTRACTION
+───────────────────────────────────────────────────────────────── */
+function detectFileType(filename = '', mime = '') {
+  const lower = (filename || '').toLowerCase();
+  if (lower.endsWith('.pptx') || lower.endsWith('.ppt') || (mime && mime.includes('presentation'))) return 'pptx';
+  if (lower.endsWith('.pdf') || mime === 'application/pdf') return 'pdf';
+  if (lower.endsWith('.docx') || lower.endsWith('.doc') || (mime && mime.includes('word'))) return 'docx';
+  if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.webp') || (mime && mime.startsWith('image/'))) return 'image';
+  return 'txt';
+}
+
+function getAttachmentIcon(fileType) {
+  switch (fileType) {
+    case 'pptx': return '📊';
+    case 'pdf': return '📄';
+    case 'docx': return '📝';
+    case 'image': return '🖼️';
+    case 'txt': return '📃';
+    default: return '📎';
+  }
+}
+
+function decodeXml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+    .replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+async function clientExtractPptx(file) {
+  if (!window.JSZip) {
+    throw new Error('JSZip library is not loaded');
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const zip = await window.JSZip.loadAsync(arrayBuffer);
+
+  let slidePaths = [];
+  try {
+    const presXmlFile = zip.file('ppt/presentation.xml');
+    const presRelsFile = zip.file('ppt/_rels/presentation.xml.rels');
+    if (presXmlFile && presRelsFile) {
+      const presXmlStr = await presXmlFile.async('string');
+      const presRelsStr = await presRelsFile.async('string');
+      const relMap = {};
+      const relRegex = /<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g;
+      let rMatch;
+      while ((rMatch = relRegex.exec(presRelsStr)) !== null) {
+        relMap[rMatch[1]] = rMatch[2];
+      }
+      const sldIdRegex = /<p:sldId[^>]*r:id="([^"]+)"/g;
+      let sMatch;
+      while ((sMatch = sldIdRegex.exec(presXmlStr)) !== null) {
+        const target = relMap[sMatch[1]];
+        if (target) {
+          const normTarget = target.startsWith('ppt/') ? target : (target.startsWith('/') ? target.slice(1) : 'ppt/' + target);
+          slidePaths.push(normTarget);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[ClientPPTX] Could not parse presentation order:', e);
+  }
+
+  if (slidePaths.length === 0) {
+    const allFiles = Object.keys(zip.files);
+    slidePaths = allFiles
+      .filter((f) => /^ppt\/slides\/slide\d+\.xml$/i.test(f))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/slide(\d+)\.xml/i)?.[1] || '0', 10);
+        const numB = parseInt(b.match(/slide(\d+)\.xml/i)?.[1] || '0', 10);
+        return numA - numB;
+      });
+  }
+
+  const slides = [];
+
+  for (let i = 0; i < slidePaths.length; i++) {
+    const slidePath = slidePaths[i];
+    const slideFile = zip.file(slidePath);
+    if (!slideFile) continue;
+
+    const xml = await slideFile.async('string');
+    const slideNum = i + 1;
+    let slideTitle = '';
+    const contentLines = [];
+
+    // Shapes & Text
+    const spRegex = /<p:sp\b[^>]*>([\s\S]*?)<\/p:sp>/g;
+    let spMatch;
+    while ((spMatch = spRegex.exec(xml)) !== null) {
+      const spXml = spMatch[1];
+      const isTitle = /<p:ph[^>]*type="(?:title|ctrTitle)"/i.test(spXml);
+      const pRegex = /<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g;
+      let pMatch;
+      const paragraphs = [];
+
+      while ((pMatch = pRegex.exec(spXml)) !== null) {
+        const pXml = pMatch[1];
+        const hasBullet = /<a:buChar|<a:buAutoNum|<a:buBlip/i.test(pXml) || /<a:pPr\b[^>]*lvl="[1-9]"/i.test(pXml);
+        const textParts = [];
+        const tRegex = /<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g;
+        let tMatch;
+        while ((tMatch = tRegex.exec(pXml)) !== null) {
+          textParts.push(decodeXml(tMatch[1]));
+        }
+        const pText = textParts.join('').trim();
+        if (pText) paragraphs.push({ text: pText, isBullet: hasBullet });
+      }
+
+      if (isTitle && !slideTitle && paragraphs.length > 0) {
+        slideTitle = paragraphs.map((p) => p.text).join(' ');
+      } else {
+        paragraphs.forEach((p) => {
+          contentLines.push(p.isBullet ? `• ${p.text}` : p.text);
+        });
+      }
+    }
+
+    // Tables
+    const tblRegex = /<a:tbl\b[^>]*>([\s\S]*?)<\/a:tbl>/g;
+    let tblMatch;
+    while ((tblMatch = tblRegex.exec(xml)) !== null) {
+      const tblXml = tblMatch[1];
+      const rowRegex = /<a:tr\b[^>]*>([\s\S]*?)<\/a:tr>/g;
+      let rowMatch;
+      const tableRows = [];
+      while ((rowMatch = rowRegex.exec(tblXml)) !== null) {
+        const trXml = rowMatch[1];
+        const cellRegex = /<a:tc\b[^>]*>([\s\S]*?)<\/a:tc>/g;
+        let cellMatch;
+        const cells = [];
+        while ((cellMatch = cellRegex.exec(trXml)) !== null) {
+          const tcXml = cellMatch[1];
+          const cellTextParts = [];
+          const tRegex = /<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g;
+          let tMatch;
+          while ((tMatch = tRegex.exec(tcXml)) !== null) {
+            cellTextParts.push(decodeXml(tMatch[1]));
+          }
+          cells.push(cellTextParts.join(' ').trim());
+        }
+        if (cells.some((c) => c.length > 0)) tableRows.push(cells);
+      }
+      if (tableRows.length > 0) {
+        contentLines.push('\n[Table]');
+        tableRows.forEach((r) => contentLines.push('| ' + r.join(' | ') + ' |'));
+        contentLines.push('');
+      }
+    }
+
+    // Notes
+    let speakerNotes = '';
+    const slideRelPath = slidePath.replace(/ppt\/slides\/(slide\d+\.xml)/i, 'ppt/slides/_rels/$1.rels');
+    const slideRelsFile = zip.file(slideRelPath);
+    if (slideRelsFile) {
+      try {
+        const relsXml = await slideRelsFile.async('string');
+        const notesRelMatch = /<Relationship[^>]*Type="[^"]*notesSlide"[^>]*Target="([^"]+)"/i.exec(relsXml);
+        if (notesRelMatch) {
+          let notesTarget = notesRelMatch[1];
+          if (!notesTarget.startsWith('ppt/')) {
+            notesTarget = notesTarget.startsWith('../') ? 'ppt/' + notesTarget.replace('../', '') : 'ppt/slides/' + notesTarget;
+          }
+          const notesFile = zip.file(notesTarget);
+          if (notesFile) {
+            const notesXml = await notesFile.async('string');
+            const notesParts = [];
+            const ntRegex = /<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g;
+            let ntMatch;
+            while ((ntMatch = ntRegex.exec(notesXml)) !== null) {
+              const txt = ntMatch[1].trim();
+              if (txt && !/^\d+$/.test(txt)) notesParts.push(decodeXml(txt));
+            }
+            if (notesParts.length > 0) speakerNotes = notesParts.join(' ');
+          }
+        }
+      } catch (e) { }
+    }
+
+    slides.push({
+      slideNumber: slideNum,
+      title: slideTitle || `Slide ${slideNum}`,
+      content: contentLines.join('\n').trim(),
+      notes: speakerNotes.trim(),
+    });
+  }
+
+  const formattedSections = slides.map((s) => {
+    let out = `### Slide ${s.slideNumber}: ${s.title}\n`;
+    if (s.content) out += `${s.content}\n`;
+    if (s.notes) out += `*Speaker Notes:* ${s.notes}\n`;
+    return out.trim();
+  });
+
+  const fullText = formattedSections.join('\n\n');
+  const totalWords = (fullText.match(/\S+/g) || []).length;
+  const isSparse = totalWords < 10 && slides.length > 0;
+
+  return {
+    slideCount: slides.length,
+    slides,
+    fullText: isSparse
+      ? `${fullText}\n\n[Note: This presentation contains minimal selectable text. Some slides may be graphic-heavy or image-only.]`
+      : fullText,
+    isSparse,
+    totalWords,
+  };
+}
+
+async function clientExtractDocx(file) {
+  if (!window.JSZip) {
+    throw new Error('JSZip library is not loaded');
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const zip = await window.JSZip.loadAsync(arrayBuffer);
+  const docXmlFile = zip.file('word/document.xml');
+  if (!docXmlFile) throw new Error('Invalid Word document structure');
+  const docXml = await docXmlFile.async('string');
+
+  const paragraphs = [];
+  const pRegex = /<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g;
+  let pMatch;
+  while ((pMatch = pRegex.exec(docXml)) !== null) {
+    const pXml = pMatch[1];
+    const tRegex = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g;
+    let tMatch;
+    const parts = [];
+    while ((tMatch = tRegex.exec(pXml)) !== null) {
+      parts.push(tMatch[1]);
+    }
+    const pText = parts.join('').trim();
+    if (pText) paragraphs.push(pText);
+  }
+  return paragraphs.join('\n\n');
+}
+
+async function clientExtractTxt(file) {
+  return await file.text();
+}
+
+function clientExtractImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderComposerAttachments() {
+  if (!composerAttachments) return;
+  const items = state.composerAttachments || [];
+
+  if (items.length === 0) {
+    composerAttachments.setAttribute('hidden', '');
+    composerAttachments.innerHTML = '';
+    updateComposerButtons();
+    return;
+  }
+
+  composerAttachments.removeAttribute('hidden');
+  composerAttachments.innerHTML = items
+    .map((att) => {
+      const icon = getAttachmentIcon(att.fileType);
+      const loadingState = att.isExtracting ? '⏳ ' : '';
+      let thumbHtml = `<span class="chip-icon">${icon}</span>`;
+      if (att.fileType === 'image' && att.dataUrl) {
+        thumbHtml = `<img class="chip-thumb" src="${att.dataUrl}" alt="${escapeHtml(att.filename)}" />`;
+      }
+      return `
+      <div class="composer-attachment-chip" data-att-id="${escapeHtml(att.id)}" title="${escapeHtml(att.filename)} (${att.formattedSize || ''})">
+        ${thumbHtml}
+        <div class="chip-info">
+          <span class="chip-name">${escapeHtml(att.filename)}</span>
+          ${att.formattedSize ? `<span class="chip-size">${loadingState}${escapeHtml(att.formattedSize)}</span>` : ''}
+        </div>
+        <span class="chip-badge">${escapeHtml(att.fileType.toUpperCase())}</span>
+        <button type="button" class="chip-remove-btn" data-action="remove-attachment" data-id="${escapeHtml(att.id)}" aria-label="Remove ${escapeHtml(att.filename)}" title="Remove attachment">✕</button>
+      </div>`;
+    })
+    .join('');
+
+  updateComposerButtons();
+}
+
+async function handleComposerFiles(fileList) {
+  if (!fileList || fileList.length === 0) return;
+  const files = Array.from(fileList);
+  const MAX_BYTES = 10 * 1024 * 1024; // 10MB limit
+
+  for (const file of files) {
+    if (file.size > MAX_BYTES) {
+      showToast(`"${file.name}" exceeds 10 MB limit. Please select a smaller file.`, 'warn');
+      continue;
+    }
+
+    const isDup = (state.composerAttachments || []).some(
+      (a) => a.filename === file.name && a.size === file.size
+    );
+    if (isDup) {
+      showToast(`"${file.name}" is already attached.`, 'info');
+      continue;
+    }
+
+    const fileType = detectFileType(file.name, file.type);
+    const attRecord = {
+      id: generateId('att'),
+      file,
+      filename: file.name,
+      fileType,
+      size: file.size,
+      formattedSize: formatBytes(file.size),
+      text: '',
+      dataUrl: '',
+      isExtracting: true,
+      error: null,
+    };
+
+    if (!state.composerAttachments) state.composerAttachments = [];
+    state.composerAttachments.push(attRecord);
+    renderComposerAttachments();
+
+    (async () => {
+      try {
+        if (fileType === 'pptx') {
+          const res = await clientExtractPptx(file);
+          attRecord.text = res.fullText;
+          attRecord.slides = res.slides;
+          attRecord.slideCount = res.slideCount;
+        } else if (fileType === 'docx') {
+          attRecord.text = await clientExtractDocx(file);
+        } else if (fileType === 'txt') {
+          attRecord.text = await clientExtractTxt(file);
+        } else if (fileType === 'image') {
+          attRecord.dataUrl = await clientExtractImage(file);
+          attRecord.text = `[Image Attached: ${file.name}]`;
+        } else if (fileType === 'pdf') {
+          if (navigator.onLine) {
+            const formData = new FormData();
+            formData.append('document', file);
+            const res = await fetch('/api/document/read', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.status === 'success') {
+              attRecord.text = data.text;
+            } else {
+              attRecord.error = data.message;
+            }
+          } else {
+            attRecord.text = `[Attached PDF: ${file.name}. Note: Full PDF OCR text extraction requires online connection.]`;
+          }
+        }
+      } catch (err) {
+        console.warn(`Extraction error for ${file.name}:`, err);
+        attRecord.error = err.message;
+      } finally {
+        attRecord.isExtracting = false;
+        renderComposerAttachments();
+      }
+    })();
+  }
+}
+
+if (composerAttachments) {
+  composerAttachments.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="remove-attachment"]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (id) {
+      state.composerAttachments = (state.composerAttachments || []).filter((a) => a.id !== id);
+      renderComposerAttachments();
+    }
+  });
+}
+
+if (attachBtn && attachmentMenu) {
+  attachBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const isOpen = !attachmentMenu.hasAttribute('hidden');
+    if (isOpen) {
+      attachmentMenu.setAttribute('hidden', '');
+      attachBtn.classList.remove('menu-open');
+      attachBtn.setAttribute('aria-expanded', 'false');
+    } else {
+      attachmentMenu.removeAttribute('hidden');
+      attachBtn.classList.add('menu-open');
+      attachBtn.setAttribute('aria-expanded', 'true');
+    }
+  });
+
+  attachmentMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const item = e.target.closest('.attachment-menu-item');
+    if (!item) return;
+    const action = item.dataset.action;
+
+    attachmentMenu.setAttribute('hidden', '');
+    attachBtn.classList.remove('menu-open');
+    attachBtn.setAttribute('aria-expanded', 'false');
+
+    if (action === 'generate-image') {
+      if (messageInput) {
+        messageInput.value = '/image ';
+        messageInput.focus();
+        autoResize();
+        showToast('Describe the image or diagram you want to generate', 'info');
+      }
+      return;
+    }
+
+    if (!composerFileInput) return;
+
+    if (action === 'upload-pdf') {
+      composerFileInput.accept = '.pdf,application/pdf';
+    } else if (action === 'upload-docx') {
+      composerFileInput.accept = '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (action === 'upload-pptx') {
+      composerFileInput.accept = '.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    } else if (action === 'upload-image') {
+      composerFileInput.accept = '.png,.jpg,.jpeg,image/png,image/jpeg';
+    } else if (action === 'upload-txt') {
+      composerFileInput.accept = '.txt,.md,.js,.py,.c,.cpp,.java,.html,.css,.json,text/plain';
+    }
+    composerFileInput.value = '';
+    composerFileInput.click();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!attachBtn.contains(e.target) && !attachmentMenu.contains(e.target)) {
+      if (!attachmentMenu.hasAttribute('hidden')) {
+        attachmentMenu.setAttribute('hidden', '');
+        attachBtn.classList.remove('menu-open');
+        attachBtn.setAttribute('aria-expanded', 'false');
+      }
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !attachmentMenu.hasAttribute('hidden')) {
+      attachmentMenu.setAttribute('hidden', '');
+      attachBtn.classList.remove('menu-open');
+      attachBtn.setAttribute('aria-expanded', 'false');
+      attachBtn.focus();
+    }
+  });
+}
+
+if (composerFileInput) {
+  composerFileInput.addEventListener('change', () => {
+    if (composerFileInput.files && composerFileInput.files.length > 0) {
+      handleComposerFiles(composerFileInput.files);
+      composerFileInput.value = '';
+    }
+  });
+}
+
+if (chatForm) {
+  ['dragenter', 'dragover'].forEach((eventName) => {
+    chatForm.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      chatForm.classList.add('drag-over');
+    });
+  });
+
+  ['dragleave', 'dragend', 'drop'].forEach((eventName) => {
+    chatForm.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      chatForm.classList.remove('drag-over');
+    });
+  });
+
+  chatForm.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length > 0) {
+      handleComposerFiles(dt.files);
+    }
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DEDICATED IMAGE GENERATION INTENT DETECTOR & ROUTER (PART 2)
+───────────────────────────────────────────────────────────────── */
+const IMAGE_NOUNS = 'image|picture|photo|photograph|illustration|drawing|artwork|wallpaper|poster|graphic|sketch|portrait|visual|cartoon|render|painting|banner';
+
+function isImageGenerationIntent(text) {
+  if (!text || typeof text !== 'string') return false;
+  const t = text.trim();
+
+  // 1. Explicit slash command
+  if (/^\/image\s+/i.test(t)) return true;
+
+  // 2. Negative guards: user asking for code, programming, explanation, theory, or reading
+  const hasCodeOrExplain = /\b(code|python|script|programming\s+language|html|css|svg|function|algorithm|opencv|canvas|pil|pillow|matplotlib)\b/i.test(t) ||
+                           /\b(explain|how\s+to|how\s+does|how\s+do|what\s+is|tell\s+me\s+about|describe\s+how|difference\s+between|tutorial|history\s+of|why\s+do)\b/i.test(t) ||
+                           /\b(read|analyze|describe|summarize|extract|transcribe|what\s+is\s+in)\s+(this|the|attached)\s+(image|picture|photo)\b/i.test(t);
+  if (hasCodeOrExplain) return false;
+
+  // 3. Positive intent matching
+  const p1 = new RegExp(`\\b(generate|create|draw|paint|make|produce|render|illustrate)\\s+(me\\s+)?(a|an|the|some)?\\s*([a-z0-9_-]+\\s+){0,3}(${IMAGE_NOUNS})\\b`, 'i');
+  if (p1.test(t)) return true;
+
+  if (/^\s*(draw|paint|sketch|illustrate)\s+(a|an|the|me)\s+/i.test(t)) return true;
+
+  const p2 = new RegExp(`\\b(can\\s+you|please|could\\s+you)\\s+(generate|create|draw|paint|make|render|illustrate)\\s+(me\\s+)?(an?|the)?\\s*([a-z0-9_-]+\\s+){0,2}(${IMAGE_NOUNS})\\b`, 'i');
+  if (p2.test(t)) return true;
+
+  return false;
+}
+
+async function handleImageGeneration(rawPrompt) {
+  let cleanPrompt = (rawPrompt || '').replace(/^\/image\s+/i, '').trim();
+  if (!cleanPrompt) {
+    cleanPrompt = 'A detailed academic diagram explaining key concepts';
+  }
+
+  let conv = state.conversations[state.activeId];
+  if (!conv) {
+    conv = createNewConversation('Image: ' + cleanPrompt.slice(0, 26));
+    state.activeId = conv.id;
+    setTopbarTitle(conv.title);
+  }
+
+  messageInput.value = '';
+  messageInput.style.height = 'auto';
+  state.isWaiting = true;
+  updateComposerButtons();
+
+  const now = Date.now();
+  const userMsg = {
+    id: generateId('msg'),
+    role: 'user',
+    content: rawPrompt.startsWith('/') ? rawPrompt : `/image ${cleanPrompt}`,
+    attachments: [],
+    timestamp: now,
+    time: formatTime(now),
+    isError: false,
+  };
+  appendMessageToActive(userMsg);
+
+  // Check offline or local preference
+  const localAi = await getLocalAI();
+  const enginePref = localAi ? localAi.getEnginePreference() : 'auto';
+  const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+
+  const requiresLocal = enginePref === 'local' || (!isOnline && enginePref === 'auto');
+
+  if (requiresLocal) {
+    // Part 2.4: Clear offline message. WebLLM cannot directly produce images.
+    const archHtml = `
+      <div class="ai-architecture-card">
+        <div class="arch-card-header">
+          <span class="arch-badge">Offline Local AI Architecture</span>
+          <span class="arch-engine">WebLLM vs. Diffusion</span>
+        </div>
+        <div class="arch-card-body">
+          <p><strong>Offline image generation is not available.</strong> Download a compatible local image model or reconnect to use online image generation.</p>
+          <div class="arch-specs-grid">
+            <div class="arch-spec-item">
+              <span class="spec-label">Active Engine</span>
+              <span class="spec-value">WebLLM (Text Generation)</span>
+            </div>
+            <div class="arch-spec-item">
+              <span class="spec-label">Local Image Model</span>
+              <span class="spec-value status-unloaded">Not Downloaded (~1.8 GB – 2.4 GB Web-SD)</span>
+            </div>
+            <div class="arch-spec-item">
+              <span class="spec-label">Hardware Requirements</span>
+              <span class="spec-value">WebGPU Stable Diffusion (4GB+ VRAM required)</span>
+            </div>
+          </div>
+          <p class="arch-consent-note">💡 WebLLM is an on-device Large Language Model runtime optimized for text, code explanations, and step-by-step reasoning. Local WebGPU Stable Diffusion diffusion weights (~1.8 GB – 2.4 GB) will never be downloaded silently without your explicit permission.</p>
+        </div>
+        <div class="arch-card-footer">
+          <button type="button" class="arch-action-btn" onclick="if(window.openSettingsModal) window.openSettingsModal(); else { const s=document.getElementById('settingsModal'); if(s) s.removeAttribute('hidden'); }">
+            <span>⚙️ Open Local AI Diagnostics</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    appendMessageToActive({
+      id: generateId('msg'),
+      role: 'model',
+      content: archHtml,
+      rawHtml: true,
+      timestamp: Date.now(),
+      time: formatTime(),
+      isError: false,
+    });
+
+    state.isWaiting = false;
+    updateComposerButtons();
+    return;
+  }
+
+  // Online Image generation
+  const aiMsgId = generateId('msg');
+  const imgId = 'img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+  const currentMode = state.imageGenMode || 'fast';
+  const t_user_submit = Date.now();
+
+  // Render placeholder message with skeleton
+  const placeholderMsg = {
+    id: aiMsgId,
+    role: 'model',
+    type: 'image',
+    imageId: imgId,
+    prompt: cleanPrompt,
+    engine: 'Gemini Image',
+    model: currentMode === 'quality' ? 'gemini-3.1-flash-image' : 'gemini-3.1-flash-lite-image',
+    mode: currentMode,
+    timestamp: Date.now(),
+    time: formatTime(),
+  };
+  appendMessageToActive(placeholderMsg);
+
+  try {
+    const res = await fetch('/api/chat/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: cleanPrompt,
+        mode: currentMode,
+        clientTimestamp: t_user_submit,
+      }),
+    });
+
+    const data = await res.json();
+    const t_browser_recv = Date.now();
+
+    if (res.ok && data.status === 'success' && data.imageBase64) {
+      // Phase 4: Use high-efficiency Blob URL to render immediately without heavy Base64 DOM repaint freeze
+      const blobUrl = base64ToBlobUrl(data.imageBase64, data.mimeType || 'image/jpeg');
+      const dataUrl = `data:${data.mimeType || 'image/jpeg'};base64,${data.imageBase64}`;
+      imageCache.set(imgId, dataUrl);
+
+      // Render image immediately
+      const imgEl = document.getElementById(`img_${imgId}`);
+      const skelEl = document.getElementById(`skeleton_${imgId}`);
+      if (imgEl) {
+        imgEl.src = blobUrl;
+        imgEl.style.display = 'block';
+        if (skelEl) skelEl.style.display = 'none';
+      }
+      const t_render_end = Date.now();
+
+      // Compute comprehensive 7-stage performance telemetry
+      const totalDurationMs = t_render_end - t_user_submit;
+      const telemetry = {
+        totalMs:           totalDurationMs,
+        clientToBackendMs: data.durations?.clientToBackendMs || 0,
+        apiMs:             data.durations?.apiProcessingMs || 0,
+        backendExtractMs:  data.durations?.backendExtractMs || 0,
+        backendTotalMs:    data.durations?.backendTotalMs || 0,
+        transferMs:        Math.max(0, t_browser_recv - (data.timestamps?.extractEnd || t_browser_recv)),
+        renderMs:          Math.max(0, t_render_end - t_browser_recv),
+        resolution:        data.resolution || (currentMode === 'quality' ? '1024x1024' : '512x512'),
+        mode:              data.mode || currentMode,
+        cached:            Boolean(data.cached),
+      };
+
+      const convNow = state.conversations[state.activeId];
+      if (convNow) {
+        const target = convNow.messages.find(m => m.id === aiMsgId);
+        if (target) {
+          target.engine = data.engine || 'Gemini Image';
+          target.model = data.model || (currentMode === 'quality' ? 'gemini-3.1-flash-image' : 'gemini-3.1-flash-lite-image');
+          target.telemetry = telemetry;
+          target.mode = telemetry.mode;
+          target.resolution = telemetry.resolution;
+        }
+        saveConversations();
+
+        // Update card header with telemetry badge
+        const cardHeaderEl = document.querySelector(`.generated-image-card[data-img-id="${imgId}"] .image-card-header`);
+        if (cardHeaderEl) {
+          const isFast = telemetry.mode !== 'quality';
+          const modeLabel = isFast ? '⚡ Fast (512px)' : '✨ Quality (1K)';
+          const totalSec = (telemetry.totalMs / 1000).toFixed(1) + 's';
+          const breakdown = `Total: ${(telemetry.totalMs/1000).toFixed(2)}s | API: ${(telemetry.apiMs/1000).toFixed(2)}s | Server: ${(telemetry.backendTotalMs/1000).toFixed(2)}s | Transfer: ${(telemetry.transferMs/1000).toFixed(2)}s | Render: ${telemetry.renderMs}ms`;
+          let telEl = cardHeaderEl.querySelector('.image-card-telemetry');
+          if (!telEl) {
+            telEl = document.createElement('div');
+            telEl.className = 'image-card-telemetry';
+            const modelEl = cardHeaderEl.querySelector('.image-card-model');
+            if (modelEl) cardHeaderEl.insertBefore(telEl, modelEl);
+            else cardHeaderEl.appendChild(telEl);
+          }
+          telEl.title = breakdown;
+          telEl.innerHTML = `<span class="telemetry-pill">${modeLabel}</span><span class="telemetry-time">${totalSec}</span>`;
+        }
+      }
+
+      // Non-blocking IndexedDB persistence in the background
+      MediaDB.saveImage(imgId, dataUrl, data.mimeType, cleanPrompt, data.engine || 'Gemini Image').catch(console.warn);
+
+      showToast(`✨ Image generated in ${(totalDurationMs / 1000).toFixed(1)}s!`, 'success');
+
+    } else {
+      let errText = `⚠️ **Image Generation Notice:** ${escapeHtml(data.message || 'Could not generate image.')}`;
+      if (data.code === 'QUOTA_EXCEEDED_FREE_TIER' || (data.message && data.message.includes('quota'))) {
+        errText = `⚠️ **Google AI Studio Free Tier Notice:** ${escapeHtml(data.message || 'Google AI Studio currently has a quota limit of 0 for image generation models on Free Tier accounts.')}`;
+      } else if (data.code === 'RATE_LIMIT_COOLDOWN') {
+        errText = `⚠️ **Service Rate Limit:** ${escapeHtml(data.message || 'Rate limit reached.')} Please wait a moment and try again.`;
+      }
+      const convNow = state.conversations[state.activeId];
+      if (convNow) {
+        const target = convNow.messages.find(m => m.id === aiMsgId);
+        if (target) {
+          delete target.type;
+          delete target.imageId;
+          target.content = errText;
+          target.isError = true;
+        }
+        saveConversations();
+        renderMessages();
+      }
+    }
+
+  } catch (err) {
+    console.error('Image generation request failed:', err);
+    const convNow = state.conversations[state.activeId];
+    if (convNow) {
+      const target = convNow.messages.find(m => m.id === aiMsgId);
+      if (target) {
+        delete target.type;
+        delete target.imageId;
+        target.content = `⚠️ **Network Error:** Could not contact server for image generation.`;
+        target.isError = true;
+      }
+      saveConversations();
+      renderMessages();
+    }
+  } finally {
+    state.isWaiting = false;
+    updateComposerButtons();
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
    FORM SUBMIT & GEMINI API DISPATCH
 ───────────────────────────────────────────────────────────────── */
 chatForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const text = messageInput.value.trim();
-  if (!text || state.isWaiting) return;
+  const hasAttachments = Array.isArray(state.composerAttachments) && state.composerAttachments.length > 0;
+  if ((!text && !hasAttachments) || state.isWaiting) return;
   submitMessage(text);
 });
 
 async function submitMessage(text) {
   if (state.isWaiting || state.isStreaming) return;
-  if (!text || typeof text !== 'string' || !text.trim()) return;
 
-  let promptText = text.trim();
+  const attachedFiles = [...(state.composerAttachments || [])];
+  state.composerAttachments = [];
+  renderComposerAttachments();
+
+  let promptText = (text || '').trim();
+  if (!promptText && attachedFiles.length > 0) {
+    promptText = 'Please provide an overview and key takeaways of this attached document.';
+  }
+  if (!promptText) return;
+
+  // ── Dedicated Image-Generation Intent Routing Layer (Part 2) ───────────────
+  if (isImageGenerationIntent(promptText) && attachedFiles.length === 0) {
+    await handleImageGeneration(promptText);
+    return;
+  }
   let requestedMode = state.learningMode;
 
   // Slash commands for ChatGPT-style quick study tools in main chat
@@ -1817,12 +3446,17 @@ async function submitMessage(text) {
 
   const now = Date.now();
   const userMsg = {
-    id:        generateId('msg'),
-    role:      'user',
-    content:   promptText,
+    id: generateId('msg'),
+    role: 'user',
+    content: promptText,
+    attachments: attachedFiles.map((a) => ({
+      filename: a.filename,
+      fileType: a.fileType,
+      formattedSize: a.formattedSize,
+    })),
     timestamp: now,
-    time:      formatTime(now),
-    isError:   false
+    time: formatTime(now),
+    isError: false
   };
   appendMessageToActive(userMsg);
 
@@ -1833,16 +3467,159 @@ async function submitMessage(text) {
     .slice(-12)
     .map(m => ({ role: m.role === 'assistant' ? 'model' : m.role, content: m.content }));
 
+  // ── Engine Resolution (Gemini vs Local AI) ─────────────────────────────────
+  const localAi = await getLocalAI();
+  const enginePref = localAi ? localAi.getEnginePreference() : 'auto';
+  const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+
+  let useLocalAi = false;
+  if (enginePref === 'local') {
+    useLocalAi = true;
+  } else if (enginePref === 'auto') {
+    useLocalAi = !isOnline;
+  } else if (enginePref === 'gemini') {
+    useLocalAi = false;
+  }
+
+  // ── Branch A: Execute with On-Device Local AI (WebLLM via WebGPU) ───────────
+  if (useLocalAi && localAi) {
+    const gpuCheck = await localAi.checkWebGPUSupport();
+    if (!gpuCheck.supported) {
+      appendMessageToActive({
+        id: generateId('msg'),
+        role: 'model',
+        content: `⚠️ **WebGPU Unsupported:** ${gpuCheck.reason}\n\nLocal AI requires WebGPU hardware acceleration. When online, you can use Gemini AI or check Chrome flags (\`chrome://flags/#enable-unsafe-webgpu\`).`,
+        timestamp: Date.now(),
+        time: formatTime(),
+        isError: true
+      });
+      state.isWaiting = false;
+      updateComposerButtons();
+      return;
+    }
+
+    const modelId = localAi.getSelectedModelId();
+    const isCached = await localAi.isModelCached(modelId);
+
+    if (!isCached && !isOnline) {
+      appendMessageToActive({
+        id: generateId('msg'),
+        role: 'model',
+        content: `⚠️ **Offline Model Setup Required**\n\nThe local AI model (**${modelId}**) has not been downloaded to this browser yet.\n\nTo enable generative AI responses offline:\n1. Connect to the internet once.\n2. Open **Settings** (⚙️) from the topbar or sidebar.\n3. Click **Download Model** under **Offline Generative AI** (~390 MB to ~980 MB).\n\nOnce cached in browser storage, StudyMate AI will generate full answers anytime with zero internet connection!`,
+        timestamp: Date.now(),
+        time: formatTime(),
+        isError: true
+      });
+      showToast('Local model not cached. Open Settings while online to download it.', 'warn');
+      state.isWaiting = false;
+      updateComposerButtons();
+      return;
+    }
+
+    showLoading();
+    state.isWaiting = true;
+    state.isStreaming = true;
+    updateComposerButtons();
+    updateEngineIndicator('running', 'Local AI (Thinking...)');
+
+    const aiMsgId = generateId('msg');
+    let firstToken = true;
+
+    try {
+      let localPrompt = promptText;
+      if (attachedFiles.length > 0) {
+        const docSnippets = attachedFiles.map((a) => {
+          const fname = a.filename || 'Attached File';
+          const ftype = (a.fileType || 'file').toUpperCase();
+          const content = (a.text || '').slice(0, 25000);
+          return `[ATTACHED DOCUMENT: "${fname}" (${ftype})]\n--- START OF DOCUMENT CONTENT ---\n${content}\n--- END OF DOCUMENT CONTENT ---`;
+        }).join('\n\n');
+        localPrompt = `${docSnippets}\n\nSTUDENT QUESTION / INSTRUCTION:\n${promptText}`;
+      }
+
+      const fullReply = await localAi.generateLocalResponse({
+        prompt: localPrompt,
+        history,
+        mode: requestedMode,
+        onInitProgress: (report) => {
+          const p = Math.round((report.progress || 0) * 100);
+          updateEngineIndicator('initializing', `Loading (${p}%)`);
+        },
+        onChunk: (delta, accumulated) => {
+          if (firstToken) {
+            firstToken = false;
+            removeLoading();
+            appendMessageToActive({
+              id: aiMsgId,
+              role: 'model',
+              content: accumulated,
+              timestamp: Date.now(),
+              time: formatTime(),
+              isError: false
+            });
+            updateEngineIndicator('local', 'Local AI (WebGPU)');
+          } else {
+            updateStreamingMessage(aiMsgId, accumulated);
+          }
+        }
+      });
+
+      finalizeStreamedMessage(aiMsgId, fullReply);
+    } catch (localErr) {
+      removeLoading();
+      if (firstToken) {
+        appendMessageToActive({
+          id: aiMsgId,
+          role: 'model',
+          content: `⚠️ **Local AI Inference Error:** ${localErr.message}\n\nPlease verify WebGPU compatibility or re-download the model in Settings.`,
+          timestamp: Date.now(),
+          time: formatTime(),
+          isError: true
+        });
+      }
+    } finally {
+      removeLoading();
+      state.isWaiting = false;
+      state.isStreaming = false;
+      updateComposerButtons();
+      updateEngineIndicator();
+      messageInput.focus();
+    }
+    return;
+  }
+
+  // ── Branch B: Execute with Gemini AI (Cloud API) ────────────────────────────
+  if (!isOnline) {
+    appendMessageToActive({
+      id: generateId('msg'),
+      role: 'model',
+      content: '⚠️ **You are currently offline.**\n\nGemini AI requires an active internet connection. To chat offline, please enable **Local AI** in **Settings (⚙️)**.',
+      timestamp: Date.now(),
+      time: formatTime(),
+      isError: true
+    });
+    showToast('Offline: Gemini AI requires internet. Local AI is available in Settings.', 'warn');
+    state.isWaiting = false;
+    updateComposerButtons();
+    return;
+  }
+
   showLoading();
 
   try {
     const res = await fetch(API_URL, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
         message: promptText,
         history,
-        mode: requestedMode
+        mode: requestedMode,
+        attachments: attachedFiles.map((a) => ({
+          filename: a.filename,
+          fileType: a.fileType,
+          text: a.text,
+          dataUrl: a.dataUrl,
+        }))
       })
     });
 
@@ -1852,35 +3629,40 @@ async function submitMessage(text) {
 
     if (res.ok && data.status === 'success' && data.reply) {
       streamMessageToActive({
-        id:        generateId('msg'),
-        role:      'model',
-        content:   data.reply,
+        id: generateId('msg'),
+        role: 'model',
+        content: data.reply,
         timestamp: Date.now(),
-        time:      formatTime(),
-        isError:   false
+        time: formatTime(),
+        isError: false
       });
     } else {
       const errText = buildErrorMessage(res.status, data);
       appendMessageToActive({
-        id:        generateId('msg'),
-        role:      'model',
-        content:   errText,
+        id: generateId('msg'),
+        role: 'model',
+        content: errText,
         timestamp: Date.now(),
-        time:      formatTime(),
-        isError:   true
+        time: formatTime(),
+        isError: true
       });
     }
 
   } catch (err) {
     removeLoading();
     state.isWaiting = false;
+    const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) ||
+      (err && err.message && (err.message.includes('offline') || err.message.includes('Failed to fetch')));
+    const offlineText = '⚠️ **Offline Mode:** Unable to connect to Google Gemini AI. Please check your internet connection and try again.';
+    const normalText = `**Network error:** Could not reach the server. Please verify that the Node.js server is running.\n\n\`${err.message}\``;
+
     appendMessageToActive({
-      id:        generateId('msg'),
-      role:      'model',
-      content:   `**Network error:** Could not reach the server. Please verify that the Node.js server is running.\n\n\`${err.message}\``,
+      id: generateId('msg'),
+      role: 'model',
+      content: isOffline ? offlineText : normalText,
       timestamp: Date.now(),
-      time:      formatTime(),
-      isError:   true
+      time: formatTime(),
+      isError: true
     });
   } finally {
     state.isWaiting = false;
@@ -1929,12 +3711,12 @@ function buildErrorMessage(status, data) {
    STUDY MODES AND LEARNING PREFERENCES
 ───────────────────────────────────────────────────────────────── */
 const MODE_DESCRIPTIONS = {
-  standard:     'Standard Academic (Balanced collegiate assistant)',
-  simple:       'Simple Explanation (Intuitive analogies & plain language)',
+  standard: 'Standard Academic (Balanced collegiate assistant)',
+  simple: 'Simple Explanation (Intuitive analogies & plain language)',
   step_by_step: 'Step-by-Step Learning (Sequential stage-by-stage progression)',
-  exam_prep:    'Exam Preparation (Definitions, formulas & high-yield traps)',
-  practice:     'Practice Questions (Includes follow-up check questions)',
-  code_focus:   'Programming Focus (Emphasizes syntax, code examples & best practices)'
+  exam_prep: 'Exam Preparation (Definitions, formulas & high-yield traps)',
+  practice: 'Practice Questions (Includes follow-up check questions)',
+  code_focus: 'Programming Focus (Emphasizes syntax, code examples & best practices)'
 };
 
 function initStudyModes() {
@@ -2039,9 +3821,9 @@ toolTabs.forEach(tab => {
 
 // ── TOOL 1: CONCEPT EXPLAINER HANDLER ────────────────────────────
 if (explainForm) {
-  const topicInput    = document.getElementById('explainTopic');
-  const levelSelect   = document.getElementById('explainLevel');
-  const styleSelect   = document.getElementById('explainStyle');
+  const topicInput = document.getElementById('explainTopic');
+  const levelSelect = document.getElementById('explainLevel');
+  const styleSelect = document.getElementById('explainStyle');
   const examplesCheck = document.getElementById('explainExamples');
 
   explainForm.addEventListener('submit', async (e) => {
@@ -2063,14 +3845,26 @@ if (explainForm) {
 
     const userPromptText = `💡 **Concept Explainer Request**: **${topic}**\n- **Student Level**: ${levelLabel}\n- **Explanation Style**: ${styleLabel}\n- **Include Examples**: ${includeExamples ? 'Yes' : 'No'}`;
 
+    if (!navigator.onLine) {
+      const localAi = await getLocalAI();
+      const isCached = localAi ? await localAi.isModelCached() : false;
+      if (!isCached) {
+        showToast('Offline: Download a local model in Settings to explain concepts offline.', 'warn');
+        return;
+      }
+      submitMessage(userPromptText);
+      showToast('Generating concept explanation via on-device Local AI (WebGPU)...', 'info');
+      return;
+    }
+
     const now = Date.now();
     appendMessageToConv(convId, {
-      id:        generateId('msg'),
-      role:      'user',
-      content:   userPromptText,
+      id: generateId('msg'),
+      role: 'user',
+      content: userPromptText,
       timestamp: now,
-      time:      formatTime(now),
-      isError:   false
+      time: formatTime(now),
+      isError: false
     });
 
     if (state.activeId === convId) {
@@ -2080,9 +3874,9 @@ if (explainForm) {
 
     try {
       const res = await fetch(`${TOOLS_API_URL}/explain`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        body: JSON.stringify({
           topic,
           level,
           style,
@@ -2099,12 +3893,12 @@ if (explainForm) {
       if (res.ok && data.status === 'success' && data.explanation) {
         const arrival = Date.now();
         const aiMsg = {
-          id:        generateId('msg'),
-          role:      'model',
-          content:   data.explanation,
+          id: generateId('msg'),
+          role: 'model',
+          content: data.explanation,
           timestamp: arrival,
-          time:      formatTime(arrival),
-          isError:   false
+          time: formatTime(arrival),
+          isError: false
         };
         if (state.activeId === convId) {
           streamMessageToActive(aiMsg);
@@ -2115,12 +3909,12 @@ if (explainForm) {
       } else {
         const arrival = Date.now();
         appendMessageToConv(convId, {
-          id:        generateId('msg'),
-          role:      'model',
-          content:   `**Concept Explainer Error:** ${escapeHtml(data.message || 'Failed to explain concept. Please try again.')}`,
+          id: generateId('msg'),
+          role: 'model',
+          content: `**Concept Explainer Error:** ${escapeHtml(data.message || 'Failed to explain concept. Please try again.')}`,
           timestamp: arrival,
-          time:      formatTime(arrival),
-          isError:   true
+          time: formatTime(arrival),
+          isError: true
         });
         showToast(data.message || 'Failed to generate explanation.', 'error');
       }
@@ -2132,12 +3926,12 @@ if (explainForm) {
       }
       const arrival = Date.now();
       appendMessageToConv(convId, {
-        id:        generateId('msg'),
-        role:      'model',
-        content:   `**Network Error:** Could not reach the server for Concept Explainer.\n\n\`${err.message}\``,
+        id: generateId('msg'),
+        role: 'model',
+        content: `**Network Error:** Could not reach the server for Concept Explainer.\n\n\`${err.message}\``,
         timestamp: arrival,
-        time:      formatTime(arrival),
-        isError:   true
+        time: formatTime(arrival),
+        isError: true
       });
       showToast(`Network error: ${err.message}`, 'error');
     }
@@ -2146,10 +3940,10 @@ if (explainForm) {
 
 // ── TOOL 2: PROGRAMMING ASSISTANT HANDLER ────────────────────────
 if (programmingForm) {
-  const langSelect  = document.getElementById('progLanguage');
-  const modeSelect  = document.getElementById('progMode');
-  const descInput   = document.getElementById('progDescription');
-  const codeInput   = document.getElementById('progCode');
+  const langSelect = document.getElementById('progLanguage');
+  const modeSelect = document.getElementById('progMode');
+  const descInput = document.getElementById('progDescription');
+  const codeInput = document.getElementById('progCode');
 
   programmingForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2172,14 +3966,26 @@ if (programmingForm) {
       userPromptText += `\n\n\`\`\`${language.toLowerCase()}\n${codeSnippet}\n\`\`\``;
     }
 
+    if (!navigator.onLine) {
+      const localAi = await getLocalAI();
+      const isCached = localAi ? await localAi.isModelCached() : false;
+      if (!isCached) {
+        showToast('Offline: Download a local model in Settings to get code help offline.', 'warn');
+        return;
+      }
+      submitMessage(userPromptText);
+      showToast('Generating code assistance via on-device Local AI (WebGPU)...', 'info');
+      return;
+    }
+
     const now = Date.now();
     appendMessageToConv(convId, {
-      id:        generateId('msg'),
-      role:      'user',
-      content:   userPromptText,
+      id: generateId('msg'),
+      role: 'user',
+      content: userPromptText,
       timestamp: now,
-      time:      formatTime(now),
-      isError:   false
+      time: formatTime(now),
+      isError: false
     });
 
     if (state.activeId === convId) {
@@ -2190,9 +3996,9 @@ if (programmingForm) {
 
     try {
       const res = await fetch(`${TOOLS_API_URL}/programming`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        body: JSON.stringify({
           language,
           mode,
           description,
@@ -2210,12 +4016,12 @@ if (programmingForm) {
       if (res.ok && data.status === 'success' && data.result) {
         const arrival = Date.now();
         const aiMsg = {
-          id:        generateId('msg'),
-          role:      'model',
-          content:   data.result,
+          id: generateId('msg'),
+          role: 'model',
+          content: data.result,
           timestamp: arrival,
-          time:      formatTime(arrival),
-          isError:   false
+          time: formatTime(arrival),
+          isError: false
         };
         if (state.activeId === convId) {
           streamMessageToActive(aiMsg);
@@ -2226,12 +4032,12 @@ if (programmingForm) {
       } else {
         const arrival = Date.now();
         appendMessageToConv(convId, {
-          id:        generateId('msg'),
-          role:      'model',
-          content:   `**Programming Assistant Error:** ${escapeHtml(data.message || 'Programming analysis failed. Please try again.')}`,
+          id: generateId('msg'),
+          role: 'model',
+          content: `**Programming Assistant Error:** ${escapeHtml(data.message || 'Programming analysis failed. Please try again.')}`,
           timestamp: arrival,
-          time:      formatTime(arrival),
-          isError:   true
+          time: formatTime(arrival),
+          isError: true
         });
         showToast(data.message || 'Programming analysis failed.', 'error');
       }
@@ -2242,12 +4048,12 @@ if (programmingForm) {
       }
       const arrival = Date.now();
       appendMessageToConv(convId, {
-        id:        generateId('msg'),
-        role:      'model',
-        content:   `**Network Error:** Could not reach the server for Programming Assistant.\n\n\`${err.message}\``,
+        id: generateId('msg'),
+        role: 'model',
+        content: `**Network Error:** Could not reach the server for Programming Assistant.\n\n\`${err.message}\``,
         timestamp: arrival,
-        time:      formatTime(arrival),
-        isError:   true
+        time: formatTime(arrival),
+        isError: true
       });
       showToast(`Network error: ${err.message}`, 'error');
     }
@@ -2256,7 +4062,7 @@ if (programmingForm) {
 
 // ── TOOL 3: NOTES SUMMARIZER HANDLER ────────────────────────────
 if (summarizeForm) {
-  const styleSelect  = document.getElementById('summarizeStyle');
+  const styleSelect = document.getElementById('summarizeStyle');
   const lengthSelect = document.getElementById('summarizeLength');
 
   if (summarizeNotes && notesCharCounter) {
@@ -2294,14 +4100,27 @@ if (summarizeForm) {
     const snippet = notes.slice(0, 160).trim().replace(/\s+/g, ' ');
     const userPromptText = `📝 **Notes Summarizer Request** (${notes.length.toLocaleString()} characters)\n- **Style**: ${styleLabel}\n- **Length**: ${lengthLabel}\n\n> *Notes Excerpt:* "${escapeHtml(snippet)}${notes.length > 160 ? '…' : ''}"`;
 
+    if (!navigator.onLine) {
+      const localAi = await getLocalAI();
+      const isCached = localAi ? await localAi.isModelCached() : false;
+      if (!isCached) {
+        showToast('Offline: Download a local model in Settings to summarize notes offline.', 'warn');
+        return;
+      }
+      const summaryPrompt = `Please summarize the following notes thoroughly using a ${styleLabel} format and ${lengthLabel} length:\n\n${notes}`;
+      submitMessage(summaryPrompt);
+      showToast('Generating notes summary via on-device Local AI (WebGPU)...', 'info');
+      return;
+    }
+
     const now = Date.now();
     appendMessageToConv(convId, {
-      id:        generateId('msg'),
-      role:      'user',
-      content:   userPromptText,
+      id: generateId('msg'),
+      role: 'user',
+      content: userPromptText,
       timestamp: now,
-      time:      formatTime(now),
-      isError:   false
+      time: formatTime(now),
+      isError: false
     });
 
     if (state.activeId === convId) {
@@ -2311,9 +4130,9 @@ if (summarizeForm) {
 
     try {
       const res = await fetch(`${TOOLS_API_URL}/summarize`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        body: JSON.stringify({
           notes,
           style,
           length
@@ -2330,12 +4149,12 @@ if (summarizeForm) {
       if (res.ok && data.status === 'success' && data.summary) {
         const arrival = Date.now();
         const aiMsg = {
-          id:        generateId('msg'),
-          role:      'model',
-          content:   data.summary,
+          id: generateId('msg'),
+          role: 'model',
+          content: data.summary,
           timestamp: arrival,
-          time:      formatTime(arrival),
-          isError:   false
+          time: formatTime(arrival),
+          isError: false
         };
         if (state.activeId === convId) {
           streamMessageToActive(aiMsg);
@@ -2346,12 +4165,12 @@ if (summarizeForm) {
       } else {
         const arrival = Date.now();
         appendMessageToConv(convId, {
-          id:        generateId('msg'),
-          role:      'model',
-          content:   `**Notes Summarizer Error:** ${escapeHtml(data.message || 'Summarization failed. Please try again.')}`,
+          id: generateId('msg'),
+          role: 'model',
+          content: `**Notes Summarizer Error:** ${escapeHtml(data.message || 'Summarization failed. Please try again.')}`,
           timestamp: arrival,
-          time:      formatTime(arrival),
-          isError:   true
+          time: formatTime(arrival),
+          isError: true
         });
         showToast(data.message || 'Summarization failed.', 'error');
       }
@@ -2363,12 +4182,12 @@ if (summarizeForm) {
       }
       const arrival = Date.now();
       appendMessageToConv(convId, {
-        id:        generateId('msg'),
-        role:      'model',
-        content:   `**Network Error:** Could not reach the server for Notes Summarizer.\n\n\`${err.message}\``,
+        id: generateId('msg'),
+        role: 'model',
+        content: `**Network Error:** Could not reach the server for Notes Summarizer.\n\n\`${err.message}\``,
         timestamp: arrival,
-        time:      formatTime(arrival),
-        isError:   true
+        time: formatTime(arrival),
+        isError: true
       });
       showToast(`Network error: ${err.message}`, 'error');
     }
@@ -2377,10 +4196,10 @@ if (summarizeForm) {
 
 // ── TOOL 4: AI QUIZ GENERATOR HANDLER ────────────────────────────
 if (quizForm) {
-  const topicInput  = document.getElementById('quizTopic');
-  const diffSelect  = document.getElementById('quizDifficulty');
+  const topicInput = document.getElementById('quizTopic');
+  const diffSelect = document.getElementById('quizDifficulty');
   const countSelect = document.getElementById('quizCount');
-  const typeSelect  = document.getElementById('quizType');
+  const typeSelect = document.getElementById('quizType');
 
   quizForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2402,14 +4221,27 @@ if (quizForm) {
 
     const userPromptText = `🎯 **AI Quiz Request**: **${topic}**\n- **Difficulty**: ${diffLabel}\n- **Questions**: ${countLabel}\n- **Format**: ${typeLabel}`;
 
+    if (!navigator.onLine) {
+      const localAi = await getLocalAI();
+      const isCached = localAi ? await localAi.isModelCached() : false;
+      if (!isCached) {
+        showToast('Offline: Download a local model in Settings to generate quizzes offline.', 'warn');
+        return;
+      }
+      const quizPrompt = `Generate a ${countLabel} practice quiz on the topic "${topic}" with ${diffLabel} difficulty level. Format: ${typeLabel}. Provide the questions followed by step-by-step explanations and answers.`;
+      submitMessage(quizPrompt);
+      showToast('Generating quiz via on-device Local AI (WebGPU)...', 'info');
+      return;
+    }
+
     const now = Date.now();
     appendMessageToConv(convId, {
-      id:        generateId('msg'),
-      role:      'user',
-      content:   userPromptText,
+      id: generateId('msg'),
+      role: 'user',
+      content: userPromptText,
       timestamp: now,
-      time:      formatTime(now),
-      isError:   false
+      time: formatTime(now),
+      isError: false
     });
 
     if (state.activeId === convId) {
@@ -2419,9 +4251,9 @@ if (quizForm) {
 
     try {
       const res = await fetch(`${TOOLS_API_URL}/quiz`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        body: JSON.stringify({
           topic,
           difficulty,
           questionCount,
@@ -2438,31 +4270,31 @@ if (quizForm) {
       if (res.ok && data.status === 'success' && Array.isArray(data.questions)) {
         const arrival = Date.now();
         appendMessageToConv(convId, {
-          id:        generateId('msg'),
-          role:      'model',
-          content:   `Generated AI Quiz on **${data.topic}** (${data.difficulty.toUpperCase()} difficulty). Test your knowledge below:`,
+          id: generateId('msg'),
+          role: 'model',
+          content: `Generated AI Quiz on **${data.topic}** (${data.difficulty.toUpperCase()} difficulty). Test your knowledge below:`,
           quizData: {
-            topic:       data.topic,
-            difficulty:  data.difficulty,
-            questions:   data.questions,
+            topic: data.topic,
+            difficulty: data.difficulty,
+            questions: data.questions,
             userAnswers: {},
             evaluations: {},
-            submitted:   false,
-            score:       null
+            submitted: false,
+            score: null
           },
           timestamp: arrival,
-          time:      formatTime(arrival),
-          isError:   false
+          time: formatTime(arrival),
+          isError: false
         });
       } else {
         const arrival = Date.now();
         appendMessageToConv(convId, {
-          id:        generateId('msg'),
-          role:      'model',
-          content:   `**AI Quiz Generator Error:** ${escapeHtml(data.message || 'Failed to generate quiz. Please try again.')}`,
+          id: generateId('msg'),
+          role: 'model',
+          content: `**AI Quiz Generator Error:** ${escapeHtml(data.message || 'Failed to generate quiz. Please try again.')}`,
           timestamp: arrival,
-          time:      formatTime(arrival),
-          isError:   true
+          time: formatTime(arrival),
+          isError: true
         });
         showToast(data.message || 'Failed to generate quiz.', 'error');
       }
@@ -2473,12 +4305,12 @@ if (quizForm) {
       }
       const arrival = Date.now();
       appendMessageToConv(convId, {
-        id:        generateId('msg'),
-        role:      'model',
-        content:   `**Network Error:** Could not reach the server for AI Quiz Generator.\n\n\`${err.message}\``,
+        id: generateId('msg'),
+        role: 'model',
+        content: `**Network Error:** Could not reach the server for AI Quiz Generator.\n\n\`${err.message}\``,
         timestamp: arrival,
-        time:      formatTime(arrival),
-        isError:   true
+        time: formatTime(arrival),
+        isError: true
       });
       showToast(`Network error: ${err.message}`, 'error');
     }
@@ -2540,11 +4372,17 @@ if (sidebarClearAllBtn) {
 }
 
 if (stopBtn) {
-  stopBtn.addEventListener('click', () => {
+  stopBtn.addEventListener('click', async () => {
     state.stopStreamingRequested = true;
     state.isWaiting = false;
+    state.isStreaming = false;
     removeLoading();
     updateComposerButtons();
+    if (localAiModule) {
+      try {
+        await localAiModule.stopGeneration();
+      } catch (e) { }
+    }
     showToast('Generation stopped.', 'info');
   });
 }
@@ -2589,6 +4427,12 @@ function initQuickToolsBar() {
       }
       messageInput.focus();
       showToast('Step-by-Step Learning Mode active!', 'info');
+    } else if (action === 'image') {
+      messageInput.value = '/image ';
+      messageInput.focus();
+      autoResize();
+      sendBtn.disabled = false;
+      showToast('Type a description for the image or diagram and hit Enter!', 'info');
     }
   });
 }
@@ -2667,7 +4511,7 @@ function loadBookmarks() {
 function saveBookmarks(items) {
   try {
     window.localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(items));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function bookmarkMessage(msgId) {
@@ -2781,7 +4625,7 @@ function initStudyPanelAndModals() {
     try {
       const savedNote = window.localStorage.getItem(QUICK_NOTES_KEY);
       if (savedNote) quickNotepad.value = savedNote;
-    } catch (e) {}
+    } catch (e) { }
 
     quickNotepad.addEventListener('input', () => {
       try {
@@ -2790,7 +4634,7 @@ function initStudyPanelAndModals() {
           notepadStatus.textContent = 'Saving...';
           setTimeout(() => { if (notepadStatus) notepadStatus.textContent = 'Saved locally'; }, 600);
         }
-      } catch (e) {}
+      } catch (e) { }
     });
   }
 
@@ -2883,6 +4727,18 @@ function initStudyPanelAndModals() {
     navSettings.addEventListener('click', () => {
       closeSidebar();
       settingsModal.removeAttribute('hidden');
+      initLocalAiSettings();
+    });
+  }
+
+  if (engineIndicatorPill && settingsModal) {
+    engineIndicatorPill.addEventListener('click', () => {
+      settingsModal.removeAttribute('hidden');
+      initLocalAiSettings();
+      const group = document.getElementById('localAiSettingsGroup');
+      if (group) {
+        group.scrollIntoView({ behavior: 'smooth' });
+      }
     });
   }
 
@@ -2897,6 +4753,177 @@ function initStudyPanelAndModals() {
       closeSettings();
       promptDeleteAllConversations();
     });
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   LOCAL AI SETTINGS & WebLLM SETUP CONTROLLER
+───────────────────────────────────────────────────────────────── */
+async function initLocalAiSettings() {
+  const localAi = await getLocalAI();
+  if (!localAi) return;
+
+  // 1. WebGPU Diagnostic Check
+  if (webgpuBadge && webgpuDesc) {
+    const gpu = await localAi.checkWebGPUSupport();
+    if (gpu.supported) {
+      webgpuBadge.textContent = 'Supported ✓';
+      webgpuBadge.className = 'status-badge-inline status-online';
+      const desc = gpu.adapterInfo?.description || gpu.adapterInfo?.vendor || 'WebGPU Device Ready';
+      webgpuDesc.textContent = `Hardware Acceleration Active (${desc})`;
+    } else {
+      webgpuBadge.textContent = 'Unsupported ✗';
+      webgpuBadge.className = 'status-badge-inline status-offline';
+      webgpuDesc.textContent = gpu.reason;
+    }
+  }
+
+  // 2. Browser Storage Persistence Check
+  if (storagePersistenceBadge && storagePersistenceDesc) {
+    const isPersisted = await localAi.isStoragePersisted();
+    if (isPersisted) {
+      storagePersistenceBadge.textContent = 'Persisted ✓';
+      storagePersistenceBadge.className = 'status-badge-inline status-online';
+      storagePersistenceDesc.textContent = 'Browser storage is persistent and safe from automatic cache eviction.';
+    } else {
+      storagePersistenceBadge.textContent = 'Standard';
+      storagePersistenceBadge.className = 'status-badge-inline';
+      storagePersistenceDesc.textContent = 'Standard storage. Persistent quota requested when model is downloaded.';
+    }
+  }
+
+  // 3. Engine Preference Routing
+  if (enginePrefSelect) {
+    enginePrefSelect.value = localAi.getEnginePreference();
+    enginePrefSelect.onchange = () => {
+      localAi.setEnginePreference(enginePrefSelect.value);
+      updateEngineIndicator();
+      showToast(`AI engine set to: ${enginePrefSelect.options[enginePrefSelect.selectedIndex].text}`, 'info');
+    };
+  }
+
+  // 4. Model Selection & Cache Refresh
+  async function refreshModelStatus() {
+    if (!localModelSelect) return;
+    const modelId = localModelSelect.value;
+    const modelInfo = localAi.SUPPORTED_MODELS.find(m => m.id === modelId);
+
+    if (modelSpecsDesc && modelInfo) {
+      modelSpecsDesc.textContent = `${modelInfo.name} (${modelInfo.sizeEstimate}, ${modelInfo.vramEstimate})`;
+    }
+
+    const isCached = await localAi.isModelCached(modelId);
+    const isEngineLoaded = localAi.getActiveEngine() && localAi.getActiveModelId() === modelId;
+
+    if (modelCacheBadge && modelCacheStatusDesc && downloadModelBtn && deleteModelBtn) {
+      if (isEngineLoaded) {
+        modelCacheBadge.textContent = 'Ready in WebGPU ✓';
+        modelCacheBadge.className = 'status-badge-inline status-online';
+        modelCacheStatusDesc.textContent = 'Model loaded in GPU VRAM and ready for instant offline inference.';
+        downloadModelBtn.textContent = 'Model Ready ✓';
+        downloadModelBtn.disabled = true;
+        deleteModelBtn.style.display = 'inline-block';
+        if (testInferenceBtn) testInferenceBtn.style.display = 'inline-block';
+      } else if (isCached) {
+        modelCacheBadge.textContent = 'Cached Locally ✓';
+        modelCacheBadge.className = 'status-badge-inline status-online';
+        modelCacheStatusDesc.textContent = 'Model weights cached in browser storage. Ready for offline inference.';
+        downloadModelBtn.textContent = 'Initialize in GPU';
+        downloadModelBtn.disabled = false;
+        deleteModelBtn.style.display = 'inline-block';
+        if (testInferenceBtn) testInferenceBtn.style.display = 'inline-block';
+      } else {
+        modelCacheBadge.textContent = 'Not Downloaded';
+        modelCacheBadge.className = 'status-badge-inline status-offline';
+        modelCacheStatusDesc.textContent = 'Model weights not yet cached. Click Download Model while online.';
+        downloadModelBtn.textContent = 'Download Model';
+        downloadModelBtn.disabled = false;
+        deleteModelBtn.style.display = 'none';
+        if (testInferenceBtn) testInferenceBtn.style.display = 'none';
+      }
+    }
+  }
+
+  if (localModelSelect) {
+    localModelSelect.value = localAi.getSelectedModelId();
+    localModelSelect.onchange = async () => {
+      localAi.setSelectedModelId(localModelSelect.value);
+      await refreshModelStatus();
+      updateEngineIndicator();
+    };
+    await refreshModelStatus();
+  }
+
+  // 5. Download Model Button
+  if (downloadModelBtn) {
+    downloadModelBtn.onclick = async () => {
+      const modelId = localModelSelect ? localModelSelect.value : localAi.getSelectedModelId();
+      downloadModelBtn.disabled = true;
+      if (deleteModelBtn) deleteModelBtn.style.display = 'none';
+      if (localAiProgressWrap) localAiProgressWrap.removeAttribute('hidden');
+
+      updateEngineIndicator('downloading', 'Downloading Model (0%)');
+
+      try {
+        await localAi.initEngine(modelId, (report) => {
+          const p = Math.round((report.progress || 0) * 100);
+          if (localAiProgressFill) localAiProgressFill.style.width = `${p}%`;
+          if (localAiProgressPercent) localAiProgressPercent.textContent = `${p}%`;
+          if (localAiProgressText) localAiProgressText.textContent = report.text || 'Downloading model weights...';
+          updateEngineIndicator('downloading', `Downloading (${p}%)`);
+        });
+
+        showToast('Local AI model downloaded and loaded in WebGPU!', 'success');
+        if (localAiProgressWrap) localAiProgressWrap.setAttribute('hidden', '');
+        await refreshModelStatus();
+        updateEngineIndicator();
+      } catch (err) {
+        showToast(`Model download failed: ${err.message}`, 'error');
+        if (localAiProgressText) localAiProgressText.textContent = `Error: ${err.message}`;
+        downloadModelBtn.disabled = false;
+        updateEngineIndicator();
+      }
+    };
+  }
+
+  // 6. Delete Local Model Button
+  if (deleteModelBtn) {
+    deleteModelBtn.onclick = async () => {
+      const modelId = localModelSelect ? localModelSelect.value : localAi.getSelectedModelId();
+      if (!confirm(`Are you sure you want to delete the local cache for ${modelId}?\nYou will need internet to re-download it.`)) {
+        return;
+      }
+      try {
+        await localAi.deleteLocalModel(modelId);
+        showToast('Local model cache deleted from browser storage.', 'info');
+        await refreshModelStatus();
+        updateEngineIndicator();
+      } catch (err) {
+        showToast(`Could not delete model: ${err.message}`, 'error');
+      }
+    };
+  }
+
+  // 7. Test Inference Button
+  if (testInferenceBtn) {
+    testInferenceBtn.onclick = async () => {
+      testInferenceBtn.disabled = true;
+      testInferenceBtn.textContent = 'Testing WebGPU...';
+      try {
+        const testReply = await localAi.generateLocalResponse({
+          prompt: 'In two short sentences, explain binary search in C.',
+          mode: 'standard',
+          onChunk: () => { }
+        });
+        showToast('WebGPU inference successful!', 'success');
+        alert(`🎓 WebGPU Local AI Test Successful!\n\n${testReply}`);
+      } catch (testErr) {
+        alert(`WebGPU Test Error: ${testErr.message}`);
+      } finally {
+        testInferenceBtn.disabled = false;
+        testInferenceBtn.textContent = 'Test Local AI';
+      }
+    };
   }
 }
 
@@ -2943,7 +4970,7 @@ function initTopbarFeatures() {
       applyTheme(newTheme);
       try {
         window.localStorage.setItem(THEME_STORAGE_KEY, newTheme);
-      } catch (e) {}
+      } catch (e) { }
       showToast(newTheme === 'dark' ? '🌙 Dark theme enabled' : '☀️ Light theme enabled', 'info');
     });
   }
@@ -2983,10 +5010,51 @@ function initTopbarFeatures() {
     }
   });
 
-  // 4. Simple Profile Display tooltip/toast
-  if (profileChip) {
-    profileChip.addEventListener('click', () => {
-      showToast('👤 Student Guest Session Active (No login needed)', 'info');
+  // 4. Student Profile Avatar with Dropdown
+  if (profileChip && profileDropdown) {
+    profileChip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = profileDropdown.hasAttribute('hidden');
+      if (isHidden) {
+        profileDropdown.removeAttribute('hidden');
+        profileChip.setAttribute('aria-expanded', 'true');
+      } else {
+        profileDropdown.setAttribute('hidden', '');
+        profileChip.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!profileDropdown.hasAttribute('hidden') && !profileDropdown.contains(e.target) && !profileChip.contains(e.target)) {
+        profileDropdown.setAttribute('hidden', '');
+        profileChip.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  if (profileSettingsBtn && settingsModal) {
+    profileSettingsBtn.addEventListener('click', () => {
+      if (profileDropdown) profileDropdown.setAttribute('hidden', '');
+      if (profileChip) profileChip.setAttribute('aria-expanded', 'false');
+      settingsModal.removeAttribute('hidden');
+      initLocalAiSettings();
+    });
+  }
+
+  if (profileSavedBtn && savedItemsModal) {
+    profileSavedBtn.addEventListener('click', () => {
+      if (profileDropdown) profileDropdown.setAttribute('hidden', '');
+      if (profileChip) profileChip.setAttribute('aria-expanded', 'false');
+      renderSavedItems();
+      savedItemsModal.removeAttribute('hidden');
+    });
+  }
+
+  if (profilePlannerBtn && plannerModal) {
+    profilePlannerBtn.addEventListener('click', () => {
+      if (profileDropdown) profileDropdown.setAttribute('hidden', '');
+      if (profileChip) profileChip.setAttribute('aria-expanded', 'false');
+      plannerModal.removeAttribute('hidden');
     });
   }
 }
@@ -3105,27 +5173,48 @@ function updateDocUI() {
   const docChatDocPill = document.getElementById('docChatDocPill');
   const docRawPre = document.getElementById('docRawPre');
   const docTextStats = document.getElementById('docTextStats');
+  const docQuickNotesBtn = document.getElementById('docQuickNotesBtn');
+  const tabDocNotes = document.getElementById('tabDocNotes');
 
   if (docState.text) {
     if (docDropzone) docDropzone.style.display = 'none';
     if (docMetaCard) docMetaCard.removeAttribute('hidden');
 
     if (docMetaFilename) docMetaFilename.textContent = docState.filename;
-    if (docMetaType) docMetaType.textContent = docState.fileType.toUpperCase();
+    if (docMetaType) docMetaType.textContent = docState.fileType === 'pptx' ? 'PowerPoint' : docState.fileType.toUpperCase();
     if (docMetaSize) docMetaSize.textContent = formatBytes(docState.fileSize);
-    if (docMetaPages) docMetaPages.textContent = `${docState.pageCount} ${docState.pageCount === 1 ? 'Page' : 'Pages'}`;
+    if (docMetaPages) {
+      docMetaPages.textContent = docState.fileType === 'pptx'
+        ? `${docState.pageCount} ${docState.pageCount === 1 ? 'Slide' : 'Slides'}`
+        : `${docState.pageCount} ${docState.pageCount === 1 ? 'Page' : 'Pages'}`;
+    }
     if (docMetaWords) docMetaWords.textContent = `${docState.wordCount.toLocaleString()} Words`;
 
-    const icons = { pdf: '📕', docx: '📘', txt: '📄' };
+    const icons = { pdf: '📕', docx: '📘', pptx: '📊', txt: '📄', image: '🖼️' };
     if (docTypeIcon) docTypeIcon.textContent = icons[docState.fileType] || '📄';
 
     if (docStatusBadge) {
-      docStatusBadge.textContent = `📄 ${docState.filename}`;
+      docStatusBadge.textContent = docState.fileType === 'pptx' ? `📊 ${docState.filename}` : `📄 ${docState.filename}`;
       docStatusBadge.classList.add('has-doc');
     }
 
     if (docChatDocPill) {
-      docChatDocPill.textContent = `📄 ${docState.filename} (${docState.pageCount}p)`;
+      docChatDocPill.textContent = docState.fileType === 'pptx'
+        ? `📊 ${docState.filename} (${docState.pageCount} slides)`
+        : `📄 ${docState.filename} (${docState.pageCount}p)`;
+    }
+
+    if (docQuickNotesBtn) {
+      docQuickNotesBtn.innerHTML = docState.fileType === 'pptx'
+        ? '<span>📊 Generate 9-Part Presentation Summary</span>'
+        : '<span>📝 Generate 9-Part Study Notes</span>';
+    }
+
+    if (tabDocNotes) {
+      const tabSpan = tabDocNotes.querySelector('span:last-child');
+      if (tabSpan) {
+        tabSpan.textContent = docState.fileType === 'pptx' ? 'Presentation Summary' : 'Study Notes (9 Sections)';
+      }
     }
 
     if (docRawPre) docRawPre.textContent = docState.text;
@@ -3143,7 +5232,7 @@ function updateDocUI() {
       docChatDocPill.textContent = '📄 No document active';
     }
     if (docRawPre) {
-      docRawPre.textContent = 'No document text available. Please upload a PDF, DOCX, or TXT document first.';
+      docRawPre.textContent = 'No document text available. Please upload a PDF, Word .docx, PowerPoint .pptx, or TXT document first.';
     }
     if (docTextStats) {
       docTextStats.textContent = '0 words • 0 chars';
@@ -3166,11 +5255,17 @@ async function handleFileUpload(file) {
   }
 
   const name = file.name.toLowerCase();
-  const isValidExt = name.endsWith('.pdf') || name.endsWith('.docx') || name.endsWith('.txt');
+  const isValidExt =
+    name.endsWith('.pdf') ||
+    name.endsWith('.docx') ||
+    name.endsWith('.pptx') ||
+    name.endsWith('.ppt') ||
+    name.endsWith('.txt');
+
   if (!isValidExt) {
     showDocError(
       'Unsupported File Format',
-      'Please upload a <strong>PDF (.pdf)</strong>, <strong>Word (.docx)</strong>, or <strong>Plain Text (.txt)</strong> document.'
+      'Please upload a <strong>PDF (.pdf)</strong>, <strong>Word (.docx)</strong>, <strong>PowerPoint (.pptx)</strong>, or <strong>Plain Text (.txt)</strong> document.'
     );
     return;
   }
@@ -3180,6 +5275,91 @@ async function handleFileUpload(file) {
   const progressPercent = document.getElementById('docProgressPercent');
   const progressText = document.getElementById('docProgressText');
 
+  // ── Offline Client-Side Extraction (WebLLM / Browser Parser) ───────────────
+  if (!navigator.onLine) {
+    if (progressWrap) progressWrap.removeAttribute('hidden');
+    if (progressFill) progressFill.style.width = '35%';
+    if (progressPercent) progressPercent.textContent = '35%';
+    if (progressText) progressText.textContent = `Reading ${file.name} locally (Offline)...`;
+
+    try {
+      let extractedData = null;
+      const fileType = detectFileType(file.name, file.type);
+
+      if (fileType === 'pptx') {
+        if (progressFill) progressFill.style.width = '70%';
+        if (progressText) progressText.textContent = 'Extracting slide titles, notes & tables on-device...';
+        const pptx = await clientExtractPptx(file);
+        extractedData = {
+          filename: file.name,
+          fileType: 'pptx',
+          fileSize: file.size,
+          pageCount: pptx.slideCount,
+          wordCount: pptx.totalWords,
+          text: pptx.fullText,
+          slides: pptx.slides,
+        };
+      } else if (fileType === 'docx') {
+        const docxText = await clientExtractDocx(file);
+        const words = (docxText.match(/\S+/g) || []).length;
+        extractedData = {
+          filename: file.name,
+          fileType: 'docx',
+          fileSize: file.size,
+          pageCount: Math.max(1, Math.ceil(words / 500)),
+          wordCount: words,
+          text: docxText,
+          slides: [],
+        };
+      } else if (fileType === 'txt') {
+        const txt = await clientExtractTxt(file);
+        const words = (txt.match(/\S+/g) || []).length;
+        extractedData = {
+          filename: file.name,
+          fileType: 'txt',
+          fileSize: file.size,
+          pageCount: Math.max(1, Math.ceil(words / 500)),
+          wordCount: words,
+          text: txt,
+          slides: [],
+        };
+      } else {
+        if (progressWrap) progressWrap.setAttribute('hidden', '');
+        showDocError(
+          'Offline Mode Notice',
+          'PDF parsing is optimized for online extraction. PowerPoint (.pptx), Word (.docx), and Text (.txt) are fully supported offline.'
+        );
+        return;
+      }
+
+      if (progressFill) progressFill.style.width = '100%';
+      if (progressPercent) progressPercent.textContent = '100%';
+      setTimeout(() => {
+        if (progressWrap) progressWrap.setAttribute('hidden', '');
+      }, 400);
+
+      docState.file = file;
+      docState.filename = extractedData.filename;
+      docState.fileSize = extractedData.fileSize;
+      docState.fileType = extractedData.fileType;
+      docState.pageCount = extractedData.pageCount;
+      docState.wordCount = extractedData.wordCount;
+      docState.text = extractedData.text;
+      docState.slides = extractedData.slides || [];
+      docState.notes = '';
+      docState.chatHistory = [];
+
+      updateDocUI();
+      showToast(`⚡ Extracted "${file.name}" on-device via WebLLM browser parser!`, 'success');
+      return;
+    } catch (offlineErr) {
+      if (progressWrap) progressWrap.setAttribute('hidden', '');
+      showDocError('Extraction Failed', offlineErr.message || 'Could not parse document offline.');
+      return;
+    }
+  }
+
+  // ── Online Server Extraction (Gemini / Server API) ──────────────────────────
   if (progressWrap) progressWrap.removeAttribute('hidden');
   if (progressFill) progressFill.style.width = '25%';
   if (progressPercent) progressPercent.textContent = '25%';
@@ -3232,6 +5412,7 @@ async function handleFileUpload(file) {
     docState.pageCount = data.pageCount;
     docState.wordCount = data.wordCount;
     docState.text = data.text;
+    docState.slides = data.slides || [];
     docState.notes = '';
     docState.chatHistory = [];
 
@@ -3249,23 +5430,26 @@ async function handleFileUpload(file) {
 
     const chatMsgs = document.getElementById('docChatMessages');
     if (chatMsgs) {
+      const unitLabel = data.fileType === 'pptx' ? 'slides' : 'pages';
+      const summaryLabel = data.fileType === 'pptx' ? 'Presentation Summary' : 'Study Notes';
       chatMsgs.innerHTML = `
         <div class="doc-chat-msg doc-chat-msg-ai">
           <div class="doc-msg-avatar">🤖</div>
           <div class="doc-msg-bubble">
             <div class="doc-msg-source-tag">Source: Document Assistant</div>
-            <p>I have read <strong>${escapeHtml(data.filename)}</strong> (${data.pageCount} ${data.pageCount === 1 ? 'page' : 'pages'}, ${data.wordCount.toLocaleString()} words). Ask me any questions, or click <strong>Study Notes</strong> to generate structured revision sheets!</p>
+            <p>I have read <strong>${escapeHtml(data.filename)}</strong> (${data.pageCount} ${unitLabel}, ${data.wordCount.toLocaleString()} words). Ask me any questions, or click <strong>${summaryLabel}</strong> to generate structured revision notes!</p>
           </div>
         </div>
       `;
     }
 
+    clearDocError();
     updateDocUI();
-    showToast(`✅ "${data.filename}" read successfully (${data.wordCount.toLocaleString()} words)!`, 'success');
+    showToast(`📄 Loaded "${data.filename}" successfully!`, 'success');
 
   } catch (err) {
     if (progressWrap) progressWrap.setAttribute('hidden', '');
-    showDocError('Network Error', 'An unexpected error occurred while uploading. Please check your connection and try again.');
+    showDocError('Upload Failed', err.message || 'Could not upload document.');
     console.error('[DocumentStudio] Upload error:', err);
   } finally {
     docState.isUploading = false;
@@ -3306,7 +5490,7 @@ function removeDocument() {
 
 async function generateDocNotes(force = false) {
   if (!docState.text) {
-    showToast('Please upload a PDF, Word, or Text document first.', 'warning');
+    showToast('Please upload a PDF, Word, PowerPoint, or Text document first.', 'warning');
     switchDocTab('upload');
     return;
   }
@@ -3335,18 +5519,145 @@ async function generateDocNotes(force = false) {
   docState.notesDepth = depth;
   docState.isGeneratingNotes = true;
 
-  const statusMessages = [
-    'Reading and parsing document contents...',
-    'Extracting core definitions and chapter structure...',
-    'Synthesizing 9-part academic revision notes...',
-    'Polishing revision sheet with Gemini AI...'
-  ];
+  const isPptx = docState.fileType === 'pptx' || (docState.filename && docState.filename.toLowerCase().endsWith('.pptx'));
+
+  const statusMessages = isPptx
+    ? [
+      'Reading presentation slides...',
+      'Extracting slide titles, notes, and tables...',
+      'Analyzing key presentation themes...',
+      'Generating 9-part presentation summary...'
+    ]
+    : [
+      'Reading and parsing document contents...',
+      'Extracting core definitions and chapter structure...',
+      'Synthesizing 9-part academic revision notes...',
+      'Polishing revision sheet with Gemini AI...'
+    ];
+
   let msgIdx = 0;
   const timer = setInterval(() => {
     msgIdx = (msgIdx + 1) % statusMessages.length;
     if (loadingText) loadingText.textContent = statusMessages[msgIdx];
   }, 2200);
 
+  // ── Offline Mode (WebLLM / Local AI) ──────────────────────────────────────
+  if (!navigator.onLine) {
+    const localAi = await getLocalAI();
+    if (!localAi) {
+      clearInterval(timer);
+      if (notesLoading) notesLoading.setAttribute('hidden', '');
+      if (notesEmpty) notesEmpty.removeAttribute('hidden');
+      if (notesBtn) notesBtn.disabled = false;
+      showToast('AI note generation offline requires Local AI. Please connect to internet or enable WebLLM in Settings.', 'warning');
+      return;
+    }
+
+    try {
+      let finalNotes = '';
+      if (isPptx && docState.slides && docState.slides.length > 10) {
+        // Slide-by-slide chunking for large presentations
+        const chunkSize = 10;
+        const totalSlides = docState.slides.length;
+        const chunkSummaries = [];
+
+        for (let i = 0; i < totalSlides; i += chunkSize) {
+          const chunkNum = Math.floor(i / chunkSize) + 1;
+          const endSlide = Math.min(i + chunkSize, totalSlides);
+          if (loadingText) loadingText.textContent = `Summarizing slides ${i + 1} to ${endSlide}...`;
+
+          const chunkSlides = docState.slides.slice(i, endSlide);
+          const chunkText = chunkSlides
+            .map((s) => `### Slide ${s.slideNumber}: ${s.title}\n${s.content}\n${s.notes ? `*Notes:* ${s.notes}` : ''}`)
+            .join('\n\n');
+
+          const chunkPrompt = `Summarize these presentation slides concisely for academic study notes:\n\n${chunkText}`;
+          const chunkSummary = await localAi.generateLocalResponse({
+            prompt: chunkPrompt,
+            history: [],
+            mode: 'standard',
+          });
+          chunkSummaries.push(`### Section ${chunkNum} (Slides ${i + 1}-${endSlide})\n${chunkSummary}`);
+        }
+
+        if (loadingText) loadingText.textContent = 'Compiling final study notes...';
+        const combinedText = chunkSummaries.join('\n\n');
+        const synthesisPrompt = `You are an expert academic professor. Below are section summaries from the presentation "${docState.filename}" (${totalSlides} total slides):\n\n${combinedText}\n\nCompile a comprehensive, structured 9-part presentation summary with these exact 9 sections:
+## 1. Presentation Overview
+## 2. Overall Summary
+## 3. Slide-by-Slide Explanation
+## 4. Important Concepts and Definitions
+## 5. Key Examination Points
+## 6. Important Formulas and Technical Terms
+## 7. Important Tables and Diagram Descriptions
+## 8. Possible Viva Questions
+## 9. Short Revision Notes`;
+
+        finalNotes = await localAi.generateLocalResponse({
+          prompt: synthesisPrompt,
+          history: [],
+          mode: 'standard',
+        });
+      } else {
+        const summaryPrompt = isPptx
+          ? `Compile a structured 9-part presentation summary for "${docState.filename}" with these exact 9 sections:
+## 1. Presentation Overview
+## 2. Overall Summary
+## 3. Slide-by-Slide Explanation
+## 4. Important Concepts and Definitions
+## 5. Key Examination Points
+## 6. Important Formulas and Technical Terms
+## 7. Important Tables and Diagram Descriptions
+## 8. Possible Viva Questions
+## 9. Short Revision Notes
+
+Presentation Slides:
+${(docState.text || '').slice(0, 25000)}`
+          : `Compile high-yield 9-part academic study notes for "${docState.filename}" with these exact 9 sections:
+## 1. Document Overview
+## 2. Topic-wise & Chapter Breakdown
+## 3. Important Definitions
+## 4. Key Concepts
+## 5. Important Points & Takeaways
+## 6. Formulas and Equations
+## 7. Illustrative Examples
+## 8. Important Revision & Exam Questions
+## 9. Quick Revision Cram Sheet
+
+Document Content:
+${(docState.text || '').slice(0, 25000)}`;
+
+        finalNotes = await localAi.generateLocalResponse({
+          prompt: summaryPrompt,
+          history: [],
+          mode: 'standard',
+        });
+      }
+
+      clearInterval(timer);
+      docState.notes = finalNotes;
+
+      if (notesLoading) notesLoading.setAttribute('hidden', '');
+      if (notesRendered) {
+        notesRendered.innerHTML = renderMarkdown(finalNotes);
+        notesRendered.removeAttribute('hidden');
+      }
+      if (genNotesText) genNotesText.textContent = 'Regenerate Notes';
+      showToast(isPptx ? '✅ 9-Part Presentation Summary generated on-device!' : '✅ 9-Part Study Notes generated on-device!', 'success');
+      return;
+    } catch (offlineNotesErr) {
+      clearInterval(timer);
+      if (notesLoading) notesLoading.setAttribute('hidden', '');
+      if (notesEmpty) notesEmpty.removeAttribute('hidden');
+      showToast('Local AI failed to generate notes: ' + offlineNotesErr.message, 'error');
+      return;
+    } finally {
+      if (notesBtn) notesBtn.disabled = false;
+      docState.isGeneratingNotes = false;
+    }
+  }
+
+  // ── Online Mode (Gemini Server API) ───────────────────────────────────────
   try {
     const res = await fetch('/api/document/summarize', {
       method: 'POST',
@@ -3354,7 +5665,9 @@ async function generateDocNotes(force = false) {
       body: JSON.stringify({
         text: docState.text,
         filename: docState.filename,
-        depth: depth
+        depth: depth,
+        fileType: docState.fileType,
+        isPresentation: isPptx,
       })
     });
 
@@ -3376,7 +5689,7 @@ async function generateDocNotes(force = false) {
       notesRendered.removeAttribute('hidden');
     }
     if (genNotesText) genNotesText.textContent = 'Regenerate Notes';
-    showToast('✅ 9-Part Study Notes generated successfully!', 'success');
+    showToast(isPptx ? '✅ 9-Part Presentation Summary generated successfully!' : '✅ 9-Part Study Notes generated successfully!', 'success');
 
   } catch (err) {
     clearInterval(timer);
@@ -3495,6 +5808,62 @@ async function sendDocChatMessage(userQuery) {
 
   docState.isChatting = true;
 
+  // ── Offline Mode (Local AI WebLLM) ────────────────────────────────────────
+  if (!navigator.onLine) {
+    const localAi = await getLocalAI();
+    if (!localAi) {
+      aiMsgEl.innerHTML = `
+        <div class="doc-msg-avatar" style="background:#ef4444;color:#fff;">⚠️</div>
+        <div class="doc-msg-bubble" style="border-color:#fca5a5;background:#fef2f2;color:#991b1b;">
+          <div class="doc-msg-source-tag" style="color:#991b1b;">Offline</div>
+          <p>Local AI is required for offline document Q&A. Please check Settings to download a local model.</p>
+        </div>
+      `;
+      docState.isChatting = false;
+      return;
+    }
+
+    try {
+      const prompt = `[DOCUMENT CONTEXT FOR "${docState.filename}"]:\n"""\n${(docState.text || '').slice(0, 15000)}\n"""\n\nStudent Question: ${query}`;
+      const reply = await localAi.generateLocalResponse({
+        prompt,
+        history: (docState.chatHistory || []).slice(-6).map((m) => ({
+          role: m.role === 'model' ? 'model' : 'user',
+          content: m.content,
+        })),
+        mode: 'standard',
+      });
+
+      docState.chatHistory.push({ role: 'user', content: query });
+      docState.chatHistory.push({ role: 'model', content: reply });
+
+      aiMsgEl.innerHTML = `
+        <div class="doc-msg-avatar">🤖</div>
+        <div class="doc-msg-bubble">
+          <div class="doc-msg-source-tag">Citing ${escapeHtml(docState.filename)} (Local AI)</div>
+          <div class="markdown-content">${renderMarkdown(reply)}</div>
+        </div>
+      `;
+    } catch (offlineChatErr) {
+      aiMsgEl.innerHTML = `
+        <div class="doc-msg-avatar" style="background:#ef4444;color:#fff;">⚠️</div>
+        <div class="doc-msg-bubble" style="border-color:#fca5a5;background:#fef2f2;color:#991b1b;">
+          <div class="doc-msg-source-tag" style="color:#991b1b;">Error</div>
+          <p>${escapeHtml(offlineChatErr.message || 'Offline Q&A failed.')}</p>
+        </div>
+      `;
+    } finally {
+      docState.isChatting = false;
+      if (chatMsgs) chatMsgs.scrollTop = chatMsgs.scrollHeight;
+      if (chatInput) {
+        chatInput.focus();
+        if (chatSendBtn) chatSendBtn.disabled = chatInput.value.trim() === '';
+      }
+    }
+    return;
+  }
+
+  // ── Online Mode (Server API Gemini) ───────────────────────────────────────
   try {
     const historyPayload = (docState.chatHistory || []).slice(-8).map(m => ({
       role: m.role === 'model' ? 'model' : 'user',
@@ -3578,31 +5947,31 @@ function clearDocChat() {
 }
 
 function initDocumentStudio() {
-  const docStudioModal     = document.getElementById('docStudioModal');
-  const closeDocStudioBtn  = document.getElementById('closeDocStudioBtn');
-  const openDocStudioBtn   = document.getElementById('openDocStudioBtn');
-  const docTabs            = document.querySelectorAll('.doc-tab');
-  const docDropzone        = document.getElementById('docDropzone');
-  const docFileInput       = document.getElementById('docFileInput');
-  const docBrowseBtn       = document.getElementById('docBrowseBtn');
-  const docRemoveBtn       = document.getElementById('docRemoveBtn');
+  const docStudioModal = document.getElementById('docStudioModal');
+  const closeDocStudioBtn = document.getElementById('closeDocStudioBtn');
+  const openDocStudioBtn = document.getElementById('openDocStudioBtn');
+  const docTabs = document.querySelectorAll('.doc-tab');
+  const docDropzone = document.getElementById('docDropzone');
+  const docFileInput = document.getElementById('docFileInput');
+  const docBrowseBtn = document.getElementById('docBrowseBtn');
+  const docRemoveBtn = document.getElementById('docRemoveBtn');
   const docErrorDismissBtn = document.getElementById('docErrorDismissBtn');
-  const docQuickNotesBtn   = document.getElementById('docQuickNotesBtn');
-  const docQuickChatBtn    = document.getElementById('docQuickChatBtn');
-  const docQuickTextBtn    = document.getElementById('docQuickTextBtn');
-  const docEmptyUploadBtn  = document.getElementById('docEmptyUploadBtn');
-  const docGenerateNotesBtn= document.getElementById('docGenerateNotesBtn');
-  const docCopyNotesBtn    = document.getElementById('docCopyNotesBtn');
-  const docDownloadNotesBtn= document.getElementById('docDownloadNotesBtn');
-  const docExportNotesBtn  = document.getElementById('docExportNotesBtn');
-  const docChatForm        = document.getElementById('docChatForm');
-  const docChatInput       = document.getElementById('docChatInput');
-  const docChatInputCount  = document.getElementById('docChatInputCount');
-  const docChatSendBtn     = document.getElementById('docChatSendBtn');
-  const docChatClearBtn    = document.getElementById('docChatClearBtn');
-  const docChatChips       = document.getElementById('docChatChips');
+  const docQuickNotesBtn = document.getElementById('docQuickNotesBtn');
+  const docQuickChatBtn = document.getElementById('docQuickChatBtn');
+  const docQuickTextBtn = document.getElementById('docQuickTextBtn');
+  const docEmptyUploadBtn = document.getElementById('docEmptyUploadBtn');
+  const docGenerateNotesBtn = document.getElementById('docGenerateNotesBtn');
+  const docCopyNotesBtn = document.getElementById('docCopyNotesBtn');
+  const docDownloadNotesBtn = document.getElementById('docDownloadNotesBtn');
+  const docExportNotesBtn = document.getElementById('docExportNotesBtn');
+  const docChatForm = document.getElementById('docChatForm');
+  const docChatInput = document.getElementById('docChatInput');
+  const docChatInputCount = document.getElementById('docChatInputCount');
+  const docChatSendBtn = document.getElementById('docChatSendBtn');
+  const docChatClearBtn = document.getElementById('docChatClearBtn');
+  const docChatChips = document.getElementById('docChatChips');
   const docTextSearchInput = document.getElementById('docTextSearchInput');
-  const docCopyRawTextBtn  = document.getElementById('docCopyRawTextBtn');
+  const docCopyRawTextBtn = document.getElementById('docCopyRawTextBtn');
 
   if (openDocStudioBtn) {
     openDocStudioBtn.addEventListener('click', () => openDocStudio('upload'));
@@ -3830,6 +6199,298 @@ window.addEventListener('keydown', (e) => {
 });
 
 /* ─────────────────────────────────────────────────────────────────
+   PROGRESSIVE WEB APP & OFFLINE RESILIENCE
+───────────────────────────────────────────────────────────────── */
+let deferredPwaPrompt = null;
+
+function initPwaAndOfflineSupport() {
+  const offlineBadge = document.getElementById('offlineIndicatorBadge');
+  const offlineBanner = document.getElementById('offlineBanner');
+  const apiStatusPill = document.getElementById('apiStatusPill');
+  const pwaStatusBadge = document.getElementById('pwaStatusBadge');
+  const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+  const pwaStatusDesc = document.getElementById('pwaStatusDesc');
+
+  // Save original status pill markup for restoration
+  const originalPillHtml = apiStatusPill ? apiStatusPill.innerHTML : null;
+
+  async function updateNetworkUI(isOnline, isInitial) {
+    const localAi = await getLocalAI();
+    const modelId = localAi ? localAi.getSelectedModelId() : null;
+    const isCached = localAi ? await localAi.isModelCached(modelId) : false;
+
+    if (!isOnline) {
+      if (offlineBadge) offlineBadge.removeAttribute('hidden');
+      if (offlineBanner) {
+        offlineBanner.removeAttribute('hidden');
+        const bannerText = offlineBanner.querySelector('.offline-banner-text');
+        if (bannerText) {
+          if (isCached) {
+            bannerText.innerHTML = '<strong>Offline Mode:</strong> On-device Local AI (WebGPU) is active. Ask study or coding questions with zero internet!';
+          } else {
+            bannerText.innerHTML = '<strong>Offline Mode:</strong> Gemini cloud paused. To enable offline generative AI, download a model in Settings.';
+          }
+        }
+      }
+      if (apiStatusPill) {
+        if (isCached) {
+          apiStatusPill.innerHTML = `
+            <span class="status-dot dot-purple"></span>
+            <span class="status-text">Local AI Active</span>
+          `;
+          apiStatusPill.title = 'Offline mode — On-device Local AI (WebGPU) is active.';
+        } else {
+          apiStatusPill.innerHTML = `
+            <span class="status-dot dot-amber"></span>
+            <span class="status-text">Offline (Cached)</span>
+          `;
+          apiStatusPill.title = 'Offline mode — Set up Local AI in Settings for offline responses.';
+        }
+      }
+      if (pwaStatusBadge) {
+        pwaStatusBadge.textContent = isCached ? 'Local AI Active' : 'Offline Mode';
+        pwaStatusBadge.className = isCached ? 'status-badge-inline status-online' : 'status-badge-inline status-offline';
+      }
+      if (pwaStatusDesc) {
+        pwaStatusDesc.textContent = isCached
+          ? 'Operating on-device via WebGPU. Full generative responses enabled.'
+          : 'Operating from cached assets. Download model in Settings to chat offline.';
+      }
+      updateEngineIndicator();
+      if (!isInitial) {
+        if (isCached) {
+          showToast('Offline Mode: Switched to On-Device Local AI (WebGPU).', 'info');
+        } else {
+          showToast('You are offline. Download the local AI model in Settings to chat offline.', 'warn');
+        }
+      }
+    } else {
+      if (offlineBadge) offlineBadge.setAttribute('hidden', '');
+      if (offlineBanner) offlineBanner.setAttribute('hidden', '');
+      if (apiStatusPill && originalPillHtml) {
+        apiStatusPill.innerHTML = originalPillHtml;
+        apiStatusPill.title = 'Connected AI Engine';
+      }
+      if (pwaStatusBadge) {
+        pwaStatusBadge.textContent = 'Active';
+        pwaStatusBadge.className = 'status-badge-inline status-online';
+      }
+      if (pwaStatusDesc) {
+        pwaStatusDesc.textContent = 'Service Worker registered. Core app available offline.';
+      }
+      updateEngineIndicator();
+      if (!isInitial) {
+        showToast('Internet connection restored. Gemini AI services reconnected.', 'success');
+      }
+    }
+  }
+
+  // Network state listeners
+  window.addEventListener('online', () => updateNetworkUI(true, false));
+  window.addEventListener('offline', () => updateNetworkUI(false, false));
+  updateNetworkUI(navigator.onLine, true);
+
+  // Register Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then((reg) => {
+          console.log('[PWA] Service Worker registered with scope:', reg.scope);
+
+          // Listen for new service worker installation
+          reg.addEventListener('updatefound', () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.addEventListener('statechange', () => {
+                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('[PWA] New version of StudyMate AI is ready.');
+                  showToast('A newer version of StudyMate AI is ready.', 'info');
+                }
+              });
+            }
+          });
+        })
+        .catch((err) => {
+          console.warn('[PWA] Service Worker registration failed:', err);
+        });
+    });
+  }
+
+  // PWA Installation prompt handler
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPwaPrompt = e;
+    if (pwaInstallBtn) {
+      pwaInstallBtn.style.display = 'inline-block';
+      pwaInstallBtn.onclick = async () => {
+        if (!deferredPwaPrompt) return;
+        deferredPwaPrompt.prompt();
+        const choice = await deferredPwaPrompt.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          showToast('Thank you for installing StudyMate AI!', 'success');
+        }
+        deferredPwaPrompt = null;
+        pwaInstallBtn.style.display = 'none';
+      };
+    }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredPwaPrompt = null;
+    if (pwaInstallBtn) pwaInstallBtn.style.display = 'none';
+    showToast('StudyMate AI installed successfully!', 'success');
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   INTERFACE APPEARANCE & VISUAL ACCESSIBILITY
+   Translucency control: adjusts background surface opacity while
+   preserving 100% text opacity and accessibility contrast.
+───────────────────────────────────────────────────────────────── */
+function applySurfaceOpacity(val, persist = true) {
+  let num = parseInt(val, 10);
+  if (isNaN(num)) num = 100;
+  // Strictly clamp between 20% and 100% as required
+  num = Math.max(20, Math.min(100, num));
+
+  const decimal = (num / 100).toFixed(2);
+  document.documentElement.style.setProperty('--app-surface-opacity', decimal);
+  document.documentElement.style.setProperty('--surface-opacity', decimal);
+
+  // Sync Preferences Modal Slider & Badge
+  if (surfaceOpacitySlider && String(surfaceOpacitySlider.value) !== String(num)) {
+    surfaceOpacitySlider.value = String(num);
+  }
+  if (surfaceOpacityVal) {
+    surfaceOpacityVal.textContent = String(num);
+  }
+
+  // Sync Topbar Popover Slider & Badge
+  const topbarSlider = document.getElementById('topbarTransparencySlider');
+  const topbarVal = document.getElementById('topbarTransparencyVal');
+  if (topbarSlider && String(topbarSlider.value) !== String(num)) {
+    topbarSlider.value = String(num);
+  }
+  if (topbarVal) {
+    topbarVal.textContent = num + '%';
+  }
+
+  // Live preview box in Preferences modal
+  const previewBox = document.getElementById('opacityPreviewBox');
+  if (previewBox) {
+    previewBox.style.setProperty('--app-surface-opacity', decimal);
+    previewBox.style.setProperty('--surface-opacity', decimal);
+  }
+
+  if (persist) {
+    try {
+      window.localStorage.setItem(OPACITY_STORAGE_KEY, String(num));
+    } catch (e) {
+      console.warn('[Appearance] Failed to save surface opacity:', e);
+    }
+  }
+}
+
+function initSurfaceOpacity() {
+  let savedOpacity = 100;
+  try {
+    const raw = window.localStorage.getItem(OPACITY_STORAGE_KEY);
+    if (raw !== null) {
+      const parsed = parseInt(raw, 10);
+      if (!isNaN(parsed) && parsed >= 20 && parsed <= 100) {
+        savedOpacity = parsed;
+      }
+    }
+  } catch (e) {
+    savedOpacity = 100;
+  }
+
+  // Apply initially without re-writing localStorage
+  applySurfaceOpacity(savedOpacity, false);
+
+  // 1. Preferences Modal Slider listeners
+  if (surfaceOpacitySlider) {
+    surfaceOpacitySlider.addEventListener('input', (e) => {
+      applySurfaceOpacity(e.target.value, false);
+    });
+    surfaceOpacitySlider.addEventListener('change', (e) => {
+      applySurfaceOpacity(e.target.value, true);
+    });
+  }
+
+  // Preferences Modal Reset button
+  if (resetOpacityBtn) {
+    resetOpacityBtn.addEventListener('click', () => {
+      applySurfaceOpacity(100, true);
+      showToast('Interface appearance reset to default (100% solid)', 'info');
+    });
+  }
+
+  // 2. Topbar Transparency Toggle Button & Popover
+  const topbarBtn = document.getElementById('topbarTransparencyBtn');
+  const topbarPopover = document.getElementById('topbarTransparencyPopover');
+  const topbarSlider = document.getElementById('topbarTransparencySlider');
+  const topbarResetBtn = document.getElementById('topbarResetOpacityBtn');
+
+  if (topbarBtn && topbarPopover) {
+    topbarBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = topbarPopover.hasAttribute('hidden');
+      if (isHidden) {
+        topbarPopover.removeAttribute('hidden');
+        topbarBtn.classList.add('active');
+        topbarBtn.setAttribute('aria-expanded', 'true');
+      } else {
+        topbarPopover.setAttribute('hidden', '');
+        topbarBtn.classList.remove('active');
+        topbarBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    topbarPopover.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!topbarBtn.contains(e.target) && !topbarPopover.contains(e.target)) {
+        if (!topbarPopover.hasAttribute('hidden')) {
+          topbarPopover.setAttribute('hidden', '');
+          topbarBtn.classList.remove('active');
+          topbarBtn.setAttribute('aria-expanded', 'false');
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !topbarPopover.hasAttribute('hidden')) {
+        topbarPopover.setAttribute('hidden', '');
+        topbarBtn.classList.remove('active');
+        topbarBtn.setAttribute('aria-expanded', 'false');
+        topbarBtn.focus();
+      }
+    });
+  }
+
+  // Topbar Slider listeners
+  if (topbarSlider) {
+    topbarSlider.addEventListener('input', (e) => {
+      applySurfaceOpacity(e.target.value, false);
+    });
+    topbarSlider.addEventListener('change', (e) => {
+      applySurfaceOpacity(e.target.value, true);
+    });
+  }
+
+  // Topbar Reset button
+  if (topbarResetBtn) {
+    topbarResetBtn.addEventListener('click', () => {
+      applySurfaceOpacity(100, true);
+      showToast('Interface appearance reset to default (100% solid)', 'info');
+    });
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
    INITIALISATION
 ───────────────────────────────────────────────────────────────── */
 (function init() {
@@ -3842,8 +6503,11 @@ window.addEventListener('keydown', (e) => {
   initTopbarFeatures();
   initStudyPanelAndModals();
   initDocumentStudio();
+  initPwaAndOfflineSupport();
+  initSurfaceOpacity();
   updateComposerButtons();
   updateStudyPanel();
+  updateEngineIndicator();
 
   const storedActiveId = window.localStorage.getItem(ACTIVE_CONV_KEY);
   if (storedActiveId && state.conversations[storedActiveId]) {
@@ -3857,8 +6521,82 @@ window.addEventListener('keydown', (e) => {
     }
   }
 
+  // Initialize desktop sidebar collapsed state from localStorage
+  try {
+    const savedSidebar = localStorage.getItem('studymate_sidebar_collapsed');
+    if (window.innerWidth > 900 && savedSidebar === 'true') {
+      document.body.classList.add('sidebar-collapsed');
+      document.documentElement.classList.add('sidebar-collapsed');
+      if (sidebar) sidebar.classList.add('collapsed');
+      if (sidebarOpenBtn) sidebarOpenBtn.setAttribute('aria-expanded', 'false');
+    } else if (window.innerWidth > 900) {
+      if (sidebarOpenBtn) sidebarOpenBtn.setAttribute('aria-expanded', 'true');
+    }
+  } catch (e) { }
+
+  // Auto-close mobile drawer on navigation or new chat
+  document.querySelectorAll('.sidebar .nav-item, .sidebar .tool-btn, .sidebar .new-chat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (window.innerWidth <= 900) {
+        closeSidebar();
+      }
+    });
+  });
+
+  // Handle window resize between desktop rail and mobile drawer
+  window.addEventListener('resize', () => {
+    if (window.innerWidth <= 900) {
+      if (sidebar) sidebar.classList.remove('collapsed');
+    } else {
+      const isSavedCollapsed = localStorage.getItem('studymate_sidebar_collapsed') === 'true';
+      if (isSavedCollapsed) {
+        document.body.classList.add('sidebar-collapsed');
+        document.documentElement.classList.add('sidebar-collapsed');
+        if (sidebar) sidebar.classList.add('collapsed');
+        if (sidebarOpenBtn) sidebarOpenBtn.setAttribute('aria-expanded', 'false');
+      } else {
+        document.body.classList.remove('sidebar-collapsed');
+        document.documentElement.classList.remove('sidebar-collapsed');
+        if (sidebar) sidebar.classList.remove('collapsed');
+        if (sidebarOpenBtn) sidebarOpenBtn.setAttribute('aria-expanded', 'true');
+      }
+      closeSidebar();
+    }
+  });
+
   renderConvoList();
   messageInput.focus();
+
+  // Phase 5: Image Generation Performance Mode Selector
+  function initImageModeSelector() {
+    const fastBtn = document.getElementById('imgModeFastBtn');
+    const qualityBtn = document.getElementById('imgModeQualityBtn');
+    const settingsSelect = document.getElementById('settingsImageModeSelect');
+
+    function applyMode(mode) {
+      state.imageGenMode = (mode === 'quality') ? 'quality' : 'fast';
+      localStorage.setItem('studymate_image_mode', state.imageGenMode);
+      if (fastBtn && qualityBtn) {
+        if (state.imageGenMode === 'fast') {
+          fastBtn.classList.add('active');
+          qualityBtn.classList.remove('active');
+        } else {
+          fastBtn.classList.remove('active');
+          qualityBtn.classList.add('active');
+        }
+      }
+      if (settingsSelect && settingsSelect.value !== state.imageGenMode) {
+        settingsSelect.value = state.imageGenMode;
+      }
+    }
+
+    if (fastBtn) fastBtn.addEventListener('click', () => applyMode('fast'));
+    if (qualityBtn) qualityBtn.addEventListener('click', () => applyMode('quality'));
+    if (settingsSelect) settingsSelect.addEventListener('change', (e) => applyMode(e.target.value));
+
+    applyMode(state.imageGenMode || 'fast');
+  }
+  initImageModeSelector();
 
   console.log(
     '%c🎓 StudyMate AI %cModern Academic Assistant Active',

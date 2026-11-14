@@ -13,8 +13,14 @@ const documentController = require('../controllers/documentController');
 // ── Main Chatbot UI ───────────────────────────────────────────────────────────
 router.get('/', chatController.getChatPage);
 
+// ── Offline Fallback Route ───────────────────────────────────────────────────
+router.get('/offline', (req, res) => {
+  res.sendFile(require('path').join(__dirname, '..', 'public', 'offline.html'));
+});
+
 // ── Chat API (Multi-turn conversations & learning mode support) ───────────────
 router.post('/api/chat', chatController.postChat);
+router.post('/api/chat/generate-image', chatController.postGenerateImage);
 
 // ── Study Tools APIs (Phase 5) ────────────────────────────────────────────────
 router.post('/api/tools/explain', toolsController.postConceptExplain);

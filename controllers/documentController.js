@@ -11,6 +11,7 @@
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const JSZip = require('jszip');
 const {
   isApiKeyConfigured,
   getGenAIClient,
@@ -18,9 +19,239 @@ const {
   getFallbackModelName,
 } = require('../config/gemini');
 
+// ── PPTX Parser Helper ────────────────────────────────────────────────────────
+function decodeXml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+    .replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+/**
+ * Extracts structured presentation text from a PowerPoint (.pptx) buffer or ArrayBuffer.
+ * Handles:
+ *  - Slide order via ppt/presentation.xml and relationships (or numerical fallback).
+ *  - Slide titles (<p:ph type="title|ctrTitle">).
+ *  - Body paragraphs, text boxes, and indented bullet points.
+ *  - Tables (<a:tbl>) formatted as Markdown tables.
+ *  - Speaker notes (<p:notes>) linked to slides.
+ *  - Sparse/image-only presentation detection.
+ */
+async function extractPptxText(bufferOrArrayBuffer) {
+  const zip = await JSZip.loadAsync(bufferOrArrayBuffer);
+  
+  // 1. Determine slide order from ppt/presentation.xml and ppt/_rels/presentation.xml.rels
+  let slidePaths = [];
+  try {
+    const presXmlFile = zip.file('ppt/presentation.xml');
+    const presRelsFile = zip.file('ppt/_rels/presentation.xml.rels');
+
+    if (presXmlFile && presRelsFile) {
+      const presXmlStr = await presXmlFile.async('string');
+      const presRelsStr = await presRelsFile.async('string');
+
+      const relMap = {};
+      const relRegex = /<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g;
+      let rMatch;
+      while ((rMatch = relRegex.exec(presRelsStr)) !== null) {
+        relMap[rMatch[1]] = rMatch[2];
+      }
+
+      const sldIdRegex = /<p:sldId[^>]*r:id="([^"]+)"/g;
+      let sMatch;
+      while ((sMatch = sldIdRegex.exec(presXmlStr)) !== null) {
+        const target = relMap[sMatch[1]];
+        if (target) {
+          const normTarget = target.startsWith('ppt/') ? target : (target.startsWith('/') ? target.slice(1) : 'ppt/' + target);
+          slidePaths.push(normTarget);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[DocumentController] Could not parse presentation.xml order, falling back to file listing:', e.message);
+  }
+
+  // Fallback: If no slide paths found from presentation.xml, find all ppt/slides/slide*.xml
+  if (slidePaths.length === 0) {
+    const allFiles = Object.keys(zip.files);
+    slidePaths = allFiles
+      .filter((f) => /^ppt\/slides\/slide\d+\.xml$/i.test(f))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/slide(\d+)\.xml/i)?.[1] || '0', 10);
+        const numB = parseInt(b.match(/slide(\d+)\.xml/i)?.[1] || '0', 10);
+        return numA - numB;
+      });
+  }
+
+  const slides = [];
+
+  for (let i = 0; i < slidePaths.length; i++) {
+    const slidePath = slidePaths[i];
+    const slideFile = zip.file(slidePath);
+    if (!slideFile) continue;
+
+    const xml = await slideFile.async('string');
+    const slideNum = i + 1;
+
+    let slideTitle = '';
+    const contentLines = [];
+
+    // Extract title & text shapes (<p:sp>)
+    const spRegex = /<p:sp\b[^>]*>([\s\S]*?)<\/p:sp>/g;
+    let spMatch;
+    while ((spMatch = spRegex.exec(xml)) !== null) {
+      const spXml = spMatch[1];
+      const isTitle = /<p:ph[^>]*type="(?:title|ctrTitle)"/i.test(spXml);
+
+      // Extract paragraphs in this shape
+      const pRegex = /<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g;
+      let pMatch;
+      const paragraphs = [];
+
+      while ((pMatch = pRegex.exec(spXml)) !== null) {
+        const pXml = pMatch[1];
+        const hasBullet = /<a:buChar|<a:buAutoNum|<a:buBlip/i.test(pXml) || /<a:pPr\b[^>]*lvl="[1-9]"/i.test(pXml);
+
+        const textParts = [];
+        const tRegex = /<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g;
+        let tMatch;
+        while ((tMatch = tRegex.exec(pXml)) !== null) {
+          textParts.push(decodeXml(tMatch[1]));
+        }
+        const paragraphText = textParts.join('').trim();
+        if (paragraphText) {
+          paragraphs.push({ text: paragraphText, isBullet: hasBullet });
+        }
+      }
+
+      if (isTitle && !slideTitle && paragraphs.length > 0) {
+        slideTitle = paragraphs.map((p) => p.text).join(' ');
+      } else {
+        paragraphs.forEach((p) => {
+          if (p.isBullet) {
+            contentLines.push(`• ${p.text}`);
+          } else {
+            contentLines.push(p.text);
+          }
+        });
+      }
+    }
+
+    // Extract Tables (<a:tbl>)
+    const tblRegex = /<a:tbl\b[^>]*>([\s\S]*?)<\/a:tbl>/g;
+    let tblMatch;
+    while ((tblMatch = tblRegex.exec(xml)) !== null) {
+      const tblXml = tblMatch[1];
+      const rowRegex = /<a:tr\b[^>]*>([\s\S]*?)<\/a:tr>/g;
+      let rowMatch;
+      const tableRows = [];
+
+      while ((rowMatch = rowRegex.exec(tblXml)) !== null) {
+        const trXml = rowMatch[1];
+        const cellRegex = /<a:tc\b[^>]*>([\s\S]*?)<\/a:tc>/g;
+        let cellMatch;
+        const cells = [];
+
+        while ((cellMatch = cellRegex.exec(trXml)) !== null) {
+          const tcXml = cellMatch[1];
+          const cellTextParts = [];
+          const tRegex = /<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g;
+          let tMatch;
+          while ((tMatch = tRegex.exec(tcXml)) !== null) {
+            cellTextParts.push(decodeXml(tMatch[1]));
+          }
+          cells.push(cellTextParts.join(' ').trim());
+        }
+        if (cells.some((c) => c.length > 0)) {
+          tableRows.push(cells);
+        }
+      }
+
+      if (tableRows.length > 0) {
+        contentLines.push('\n[Table]');
+        tableRows.forEach((row) => {
+          contentLines.push('| ' + row.join(' | ') + ' |');
+        });
+        contentLines.push('');
+      }
+    }
+
+    // Check for Speaker Notes (<p:notes>)
+    let speakerNotes = '';
+    const slideRelPath = slidePath.replace(/ppt\/slides\/(slide\d+\.xml)/i, 'ppt/slides/_rels/$1.rels');
+    const slideRelsFile = zip.file(slideRelPath);
+    if (slideRelsFile) {
+      try {
+        const relsXml = await slideRelsFile.async('string');
+        const notesRelMatch = /<Relationship[^>]*Type="[^"]*notesSlide"[^>]*Target="([^"]+)"/i.exec(relsXml);
+        if (notesRelMatch) {
+          let notesTarget = notesRelMatch[1];
+          if (!notesTarget.startsWith('ppt/')) {
+            notesTarget = notesTarget.startsWith('../') ? 'ppt/' + notesTarget.replace('../', '') : 'ppt/slides/' + notesTarget;
+          }
+          const notesFile = zip.file(notesTarget);
+          if (notesFile) {
+            const notesXml = await notesFile.async('string');
+            const notesParts = [];
+            const ntRegex = /<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g;
+            let ntMatch;
+            while ((ntMatch = ntRegex.exec(notesXml)) !== null) {
+              const txt = ntMatch[1].trim();
+              if (txt && !/^\d+$/.test(txt)) {
+                notesParts.push(decodeXml(txt));
+              }
+            }
+            if (notesParts.length > 0) {
+              speakerNotes = notesParts.join(' ');
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore note parsing errors
+      }
+    }
+
+    slides.push({
+      slideNumber: slideNum,
+      title: slideTitle || `Slide ${slideNum}`,
+      content: contentLines.join('\n').trim(),
+      notes: speakerNotes.trim(),
+    });
+  }
+
+  // Format full text preserving slide-by-slide structure
+  const formattedSections = slides.map((s) => {
+    let out = `### Slide ${s.slideNumber}: ${s.title}\n`;
+    if (s.content) out += `${s.content}\n`;
+    if (s.notes) out += `*Speaker Notes:* ${s.notes}\n`;
+    return out.trim();
+  });
+
+  const fullText = formattedSections.join('\n\n');
+  const totalWords = (fullText.match(/\S+/g) || []).length;
+  const isSparse = totalWords < 10 && slides.length > 0;
+
+  return {
+    slideCount: slides.length,
+    slides,
+    fullText: isSparse
+      ? (fullText ? `${fullText}\n\n[Note: This presentation contains minimal selectable text. Some slides may be graphic-heavy or image-only.]` : '[This presentation contains no selectable text or only graphic slides.]')
+      : fullText,
+    isSparse,
+    totalWords,
+  };
+}
+
+exports.extractPptxText = extractPptxText;
+
 // ── Multer In-Memory Storage Configuration ─────────────────────────────────────
 // Uses memoryStorage to avoid leaving orphaned files on disk.
-// Strict 10MB limit and file filter for PDF, DOCX, and TXT.
+// Strict 10MB limit and file filter for PDF, DOCX, PPTX, TXT, and images.
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 const storage = multer.memoryStorage();
@@ -30,10 +261,24 @@ const fileFilter = (req, file, cb) => {
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/msword',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-powerpoint',
     'text/plain',
+    'image/png',
+    'image/jpeg',
+    'image/webp',
   ];
   const ext = (file.originalname || '').toLowerCase();
-  const hasValidExt = ext.endsWith('.pdf') || ext.endsWith('.docx') || ext.endsWith('.txt');
+  const hasValidExt =
+    ext.endsWith('.pdf') ||
+    ext.endsWith('.docx') ||
+    ext.endsWith('.pptx') ||
+    ext.endsWith('.ppt') ||
+    ext.endsWith('.txt') ||
+    ext.endsWith('.png') ||
+    ext.endsWith('.jpg') ||
+    ext.endsWith('.jpeg') ||
+    ext.endsWith('.webp');
 
   if (allowedMimes.includes(file.mimetype) || hasValidExt) {
     cb(null, true);
@@ -65,7 +310,7 @@ exports.uploadMiddleware = (req, res, next) => {
         return res.status(400).json({
           status: 'error',
           code: 'UNSUPPORTED_FILE_TYPE',
-          message: 'Unsupported file format. Please upload a PDF (.pdf), Word (.docx), or Text (.txt) file.',
+          message: 'Unsupported file format. Please upload a PDF (.pdf), Word (.docx), PowerPoint (.pptx), or Text (.txt) file.',
         });
       }
       return res.status(400).json({
@@ -173,7 +418,55 @@ exports.postDocumentRead = async (req, res) => {
       }
     }
 
-    // ── C. Plain Text (.txt) Extraction ────────────────────────────────────────
+    // ── C. PowerPoint (.pptx) Extraction ──────────────────────────────────────
+    else if (
+      lowerName.endsWith('.pptx') ||
+      lowerName.endsWith('.ppt') ||
+      mimetype.includes('presentationml') ||
+      mimetype.includes('ms-powerpoint')
+    ) {
+      fileType = 'pptx';
+      try {
+        const pptxResult = await extractPptxText(buffer);
+        extractedText = (pptxResult.fullText || '').trim();
+        pageCount = pptxResult.slideCount || 1;
+
+        if (pptxResult.isSparse && (!extractedText || extractedText.length === 0)) {
+          return res.status(422).json({
+            status: 'error',
+            code: 'SPARSE_PPTX_NO_TEXT',
+            message:
+              'This PowerPoint presentation appears to contain only images or diagrams with no selectable text. Optical Character Recognition (OCR) is required to convert slide images into readable text.',
+            pageCount,
+            fileType,
+            filename: originalname,
+            fileSize: size,
+          });
+        }
+      } catch (pptxErr) {
+        console.error('[DocumentController] PPTX parse error:', pptxErr.message);
+        return res.status(422).json({
+          status: 'error',
+          code: 'PPTX_PARSE_FAILED',
+          message: 'Could not parse this PowerPoint presentation. Please ensure it is a valid .pptx file.',
+        });
+      }
+    }
+
+    // ── D. Image File (PNG, JPG, WebP) Extraction ──────────────────────────────
+    else if (
+      lowerName.endsWith('.png') ||
+      lowerName.endsWith('.jpg') ||
+      lowerName.endsWith('.jpeg') ||
+      lowerName.endsWith('.webp') ||
+      mimetype.startsWith('image/')
+    ) {
+      fileType = 'image';
+      extractedText = `[Uploaded Image: ${originalname} (${(size / 1024).toFixed(1)} KB)]`;
+      pageCount = 1;
+    }
+
+    // ── E. Plain Text (.txt) Extraction ────────────────────────────────────────
     else {
       fileType = 'txt';
       try {
@@ -190,12 +483,15 @@ exports.postDocumentRead = async (req, res) => {
       }
     }
 
-    // ── D. Validate Extracted Content ──────────────────────────────────────────
+    // ── F. Validate Extracted Content ──────────────────────────────────────────
     if (!extractedText || extractedText.trim().length === 0) {
       return res.status(422).json({
         status: 'error',
         code: 'EMPTY_DOCUMENT',
-        message: 'The uploaded file is empty or does not contain any readable text.',
+        message:
+          fileType === 'pptx'
+            ? 'This PowerPoint presentation is empty or contains no readable text.'
+            : 'The uploaded file is empty or does not contain any readable text.',
       });
     }
 
@@ -235,7 +531,13 @@ exports.postDocumentRead = async (req, res) => {
 // ── 2. Generate Structured Summarized Study Notes ──────────────────────────────
 exports.postDocumentSummarize = async (req, res) => {
   try {
-    const { text, filename = 'Uploaded Document', depth = 'medium' } = req.body || {};
+    const {
+      text,
+      filename = 'Uploaded Document',
+      depth = 'medium',
+      fileType = 'auto',
+      isPresentation: reqIsPresentation,
+    } = req.body || {};
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return res.status(400).json({
@@ -262,6 +564,14 @@ exports.postDocumentSummarize = async (req, res) => {
       });
     }
 
+    // Determine if document is a presentation
+    const isPresentation =
+      reqIsPresentation === true ||
+      fileType === 'pptx' ||
+      fileType === 'presentation' ||
+      (filename && (filename.toLowerCase().endsWith('.pptx') || filename.toLowerCase().endsWith('.ppt'))) ||
+      text.includes('### Slide ');
+
     // Safe bounds: cap input text at 60,000 characters to keep within fast token budgets
     const cappedText = text.slice(0, 60000);
 
@@ -274,7 +584,48 @@ exports.postDocumentSummarize = async (req, res) => {
       depthGuidance = 'Generate standard, balanced academic study notes suitable for college exam preparation.';
     }
 
-    const systemInstruction = `You are an expert academic curriculum designer and student notes compiler.
+    let systemInstruction = '';
+    if (isPresentation) {
+      systemInstruction = `You are an expert academic curriculum designer, professor, and presentation analyst.
+Your task is to analyze the student's uploaded PowerPoint presentation ("${filename}") and produce an authoritative, high-yield, structured 9-part presentation summary.
+
+STRICT ACCURACY RULES:
+1. Base all notes strictly and faithfully on the content provided in the presentation slides.
+2. DO NOT invent facts, citations, or formulas not present or directly implied by the slides.
+3. If diagrams, tables, or formulas are present in the presentation, summarize their meaning accurately.
+4. Organize your response into the exact 9 sections specified below, using clean GitHub-flavored Markdown.
+
+FORMAT YOUR NOTES WITH THESE EXACT 9 SECTIONS:
+## 1. Presentation Overview
+Provide the presentation title, estimated academic subject or topic, and total slide count.
+
+## 2. Overall Summary
+Comprehensive executive summary of the entire slide deck, its core thesis, and primary message.
+
+## 3. Slide-by-Slide Explanation
+Detailed breakdown preserving slide numbers and topics, explaining the core content of each slide clearly.
+
+## 4. Important Concepts and Definitions
+Glossary of all foundational concepts, theoretical definitions, and core terminology presented in the slides.
+
+## 5. Key Examination Points
+High-yield concepts, exam questions professors typically formulate from these slides, and critical distinctions.
+
+## 6. Important Formulas and Technical Terms
+Any mathematical formulas, algorithmic notation, or specialized technical terms found in the presentation (or state "No explicit mathematical formulas in this presentation.").
+
+## 7. Important Tables and Diagram Descriptions
+Descriptions and analyses of tables, diagrams, workflows, or comparisons presented in the slides (or state "No complex tables or diagrams in this slide deck.").
+
+## 8. Possible Viva Questions
+5 to 8 challenging oral examination / viva questions based on the deck with concise model answers.
+
+## 9. Short Revision Notes
+Condensed rapid-revision bullet points for last-minute exam recall.
+
+Tone: Authoritative, academic, clear, and encouraging for students. Depth guidance: ${depthGuidance}`;
+    } else {
+      systemInstruction = `You are an expert academic curriculum designer and student notes compiler.
 Your task is to analyze the student's uploaded document ("${filename}") and produce a set of high-yield, structured study notes.
 
 STRICT ACCURACY RULES:
@@ -312,6 +663,7 @@ Concrete practical examples, case studies, or walk-throughs provided in the text
 A condensed 60-second summary sheet designed for immediate review before an exam.
 
 Tone: Authoritative, academic, clear, and encouraging for students. Depth guidance: ${depthGuidance}`;
+    }
 
     const userPrompt = `Here is the uploaded document text for "${filename}":\n\n"""\n${cappedText}\n"""\n\nPlease compile the complete 9-section structured study notes.`;
 
@@ -350,6 +702,7 @@ Tone: Authoritative, academic, clear, and encouraging for students. Depth guidan
       status: 'success',
       filename,
       depth,
+      isPresentation,
       notes: notesText.trim(),
     });
 
@@ -418,6 +771,9 @@ exports.postDocumentChat = async (req, res) => {
         .split(/\s+/)
         .filter((w) => w.length > 2);
 
+      const slideMatch = question.match(/slide\s*(\d+)/i);
+      const targetSlideNum = slideMatch ? parseInt(slideMatch[1], 10) : null;
+
       // Score chunks by keyword matches
       const scoredChunks = rawChunks.map((chunk, idx) => {
         const lowerChunk = chunk.toLowerCase();
@@ -425,6 +781,14 @@ exports.postDocumentChat = async (req, res) => {
         queryWords.forEach((word) => {
           if (lowerChunk.includes(word)) score += 1;
         });
+        if (
+          targetSlideNum !== null &&
+          (lowerChunk.includes(`slide ${targetSlideNum}:`) ||
+            lowerChunk.includes(`slide ${targetSlideNum}\n`) ||
+            lowerChunk.includes(`slide ${targetSlideNum} `))
+        ) {
+          score += 100;
+        }
         return { chunk, score, idx };
       });
 
