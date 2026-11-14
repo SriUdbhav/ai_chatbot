@@ -15,6 +15,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Enable trust proxy when deployed behind reverse proxies (Render, Railway, Heroku, etc.)
 if (process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY === 'true') {
@@ -92,15 +93,32 @@ app.use((err, req, res, next) => {
 });
 
 // ── 8. Start ──────────────────────────────────────────────────────────────────
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, HOST, () => {
   const { isApiKeyConfigured, getModelName } = require('./config/gemini');
   console.log('═══════════════════════════════════════════════');
-  console.log('🎓  AI Study Assistant — Phase 5');
-  console.log(`📍  http://localhost:${PORT}`);
-  console.log(`⚡  Node.js ${process.version}`);
+  console.log('🎓  AI Study Assistant — Production Server');
+  console.log(`📍  Listening on http://${HOST}:${PORT}`);
+  console.log(`⚡  Node.js ${process.version} | Mode: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🤖  Gemini Model : ${getModelName()}`);
   console.log(`🔑  API Key      : ${isApiKeyConfigured() ? 'Configured ✓' : 'MISSING ✗'}`);
   console.log('═══════════════════════════════════════════════');
+});
+
+// Process-level resilience and signal handling (Phase 2)
+process.on('uncaughtException', (err) => {
+  console.error('[Server Error] Uncaught Exception:', err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server Error] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('SIGTERM', () => {
+  console.log('[Server] SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('[Server] HTTP server closed.');
+    process.exit(0);
+  });
 });
 
 module.exports = { app, server };

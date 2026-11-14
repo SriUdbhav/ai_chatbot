@@ -59,3 +59,18 @@ exports.getApiStatus = (req, res) => {
     model: getModelName()
   });
 };
+
+/**
+ * Lightweight health check endpoint for Render production monitoring.
+ * Returns HTTP 200 OK when server is running and responsive.
+ */
+exports.getHealth = (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'StudyMate AI',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    geminiConfigured: isApiKeyConfigured(),
+  });
+};

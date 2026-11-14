@@ -34,7 +34,8 @@ router.post('/api/document/read', documentController.uploadMiddleware, documentC
 router.post('/api/document/summarize', documentController.postDocumentSummarize);
 router.post('/api/document/chat', documentController.postDocumentChat);
 
-// ── Server Health Check ───────────────────────────────────────────────────────
+// ── Server Health Check & Diagnostics (Render Web Service) ────────────────────
+router.get('/health', homeController.getHealth);
 router.get('/api/status', homeController.getApiStatus);
 
 module.exports = router;

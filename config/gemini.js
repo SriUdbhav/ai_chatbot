@@ -13,6 +13,8 @@ const { GoogleGenAI } = require('@google/genai');
 // ── Model selection ────────────────────────────────────────────────────────────
 // Preferred model: gemini-3.5-flash-lite (fast, highly available, low latency).
 // Fallback: gemini-3.8-flash.
+const PREFERRED_MODEL        = 'gemini-3.5-flash-lite';
+const FALLBACK_MODEL         = 'gemini-3.8-flash';
 // Preferred Image Models: Gemini 3.1 generation
 // Fast Mode: gemini-3.1-flash-lite-image (lowest latency, 512px preview, minimal thinking)
 // Quality Mode: gemini-3.1-flash-image (high-detail 1K/2K resolution)
