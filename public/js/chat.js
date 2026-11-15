@@ -2766,31 +2766,6 @@ messagesArea.addEventListener('input', (e) => {
   }
 });
 
-// Contain code block wheel scroll: prevents scrolling code from bubbling/chaining to the outer chat viewport
-messagesArea.addEventListener('wheel', (e) => {
-  const codePre = e.target.closest('.code-block-pre, .ai-bubble pre, .ai-card pre');
-  if (!codePre) return;
-  const canScrollVertically = codePre.scrollHeight > codePre.clientHeight;
-  const canScrollHorizontally = codePre.scrollWidth > codePre.clientWidth;
-  if (!canScrollVertically && !canScrollHorizontally) return;
-
-  if (Math.abs(e.deltaY) >= Math.abs(e.deltaX) && canScrollVertically) {
-    const atTop = codePre.scrollTop <= 0 && e.deltaY < 0;
-    const atBottom = (codePre.scrollTop + codePre.clientHeight >= codePre.scrollHeight - 1) && e.deltaY > 0;
-    if (atTop || atBottom) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  } else if (Math.abs(e.deltaX) > 0 && canScrollHorizontally) {
-    const atLeft = codePre.scrollLeft <= 0 && e.deltaX < 0;
-    const atRight = (codePre.scrollLeft + codePre.clientWidth >= codePre.scrollWidth - 1) && e.deltaX > 0;
-    if (atLeft || atRight) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }
-}, { passive: false });
-
 /* ─────────────────────────────────────────────────────────────────
    TEXTAREA AUTO-RESIZE & KEY SHORTCUTS
 ───────────────────────────────────────────────────────────────── */

@@ -2083,7 +2083,7 @@ body[data-theme="dark"] .user-bubble {
   overscroll-behavior: contain !important;
   overscroll-behavior-x: contain !important;
   overscroll-behavior-y: contain !important;
-  max-height: min(68vh, 540px);
+  max-height: 500px !important;
   max-width: 100%;
   width: 100%;
   min-width: 0;
@@ -2093,7 +2093,7 @@ body[data-theme="dark"] .user-bubble {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.45) rgba(15, 23, 42, 0.35);
+  scrollbar-color: rgba(148, 163, 184, 0.55) rgba(15, 23, 42, 0.45);
   word-break: normal !important;
   word-wrap: normal !important;
   overflow-wrap: normal !important;
@@ -2229,7 +2229,7 @@ body[data-theme="dark"] .user-bubble {
   overflow-x: auto !important;
   overflow-y: auto !important;
   max-height: 560px;
-  max-height: min(68vh, 560px) !important;
+  max-height: 500px !important;
   max-width: 100% !important;
   width: 100% !important;
   min-width: 0 !important;
@@ -2238,11 +2238,18 @@ body[data-theme="dark"] .user-bubble {
   overscroll-behavior-x: contain !important;
   overscroll-behavior-y: contain !important;
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.45) rgba(15, 23, 42, 0.35);
+  scrollbar-color: rgba(148, 163, 184, 0.55) rgba(15, 23, 42, 0.45);
   word-break: normal !important;
   word-wrap: normal !important;
   overflow-wrap: normal !important;
   -webkit-overflow-scrolling: touch;
+}
+
+.code-block:hover .code-block-pre,
+.code-block-pre:hover,
+.ai-bubble pre:hover,
+.ai-card pre:hover {
+  scrollbar-color: rgba(190, 205, 230, 0.85) rgba(15, 23, 42, 0.65);
 }
 
 .code-block-content {
@@ -2264,32 +2271,49 @@ body[data-theme="dark"] .user-bubble {
   overflow-wrap: normal !important;
 }
 
-/* Custom Scrollbars for Code Blocks (Desktop & WebKit) */
+/* Custom Scrollbars for Code Blocks (Desktop & WebKit) - Kept strictly inside the code container */
 .code-block-pre::-webkit-scrollbar,
 .ai-bubble pre::-webkit-scrollbar,
 .ai-card pre::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
 }
 
 .code-block-pre::-webkit-scrollbar-thumb,
 .ai-bubble pre::-webkit-scrollbar-thumb,
 .ai-card pre::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.45);
-  border-radius: 4px;
+  background-color: rgba(148, 163, 184, 0.55);
+  border-radius: 5px;
+  border: 1.5px solid rgba(15, 23, 42, 0.35);
+}
+
+/* Visible and highlighted on code block hover and interaction */
+.code-block:hover .code-block-pre::-webkit-scrollbar-thumb,
+.code-block-pre:hover::-webkit-scrollbar-thumb,
+.ai-bubble:hover pre::-webkit-scrollbar-thumb,
+.ai-bubble pre:hover::-webkit-scrollbar-thumb,
+.ai-card pre:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(190, 205, 230, 0.85);
 }
 
 .code-block-pre::-webkit-scrollbar-thumb:hover,
 .ai-bubble pre::-webkit-scrollbar-thumb:hover,
 .ai-card pre::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(148, 163, 184, 0.75);
+  background-color: #818cf8 !important; /* Antigravity accent glow on direct thumb grab */
 }
 
 .code-block-pre::-webkit-scrollbar-track,
 .ai-bubble pre::-webkit-scrollbar-track,
 .ai-card pre::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.35);
-  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.45);
+  border-radius: 5px;
+}
+
+.code-block:hover .code-block-pre::-webkit-scrollbar-track,
+.code-block-pre:hover::-webkit-scrollbar-track,
+.ai-bubble pre:hover::-webkit-scrollbar-track,
+.ai-card pre:hover::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.65);
 }
 
 .code-block-pre::-webkit-scrollbar-corner,

@@ -343,10 +343,14 @@ try {
   const preRule = chatCss.match(/\.code-block-pre\s*\{([\s\S]*?)\}/)?.[1] || '';
 
   assert.ok(preRule.includes('overflow-y: auto'), '.code-block-pre has overflow-y: auto for vertical scrolling');
-  assert.ok(preRule.includes('max-height: 560px'), '.code-block-pre has max-height: 560px');
+  assert.ok(preRule.includes('max-height: 500px'), '.code-block-pre has max-height: 500px on desktop');
   assert.ok(preRule.includes('box-sizing: border-box'), '.code-block-pre has box-sizing: border-box');
 
-  pass('Independent vertical scrolling enabled with max-height cap');
+  // Verify that an 184-line C program height (~4000px) exceeds 500px desktop max-height
+  const estimatedContentHeight = 184 * 21.76;
+  assert.ok(estimatedContentHeight > 500, `Content height (${Math.round(estimatedContentHeight)}px) exceeds 500px container height`);
+
+  pass('Independent vertical scrolling enabled with ~500px desktop max-height cap');
 } catch (err) {
   fail('Vertical Scrolling & Max Height', err);
 }
@@ -387,8 +391,8 @@ try {
   fail('Parent Container Containment', err);
 }
 
-// ── TEST 6: Scroll Containment (No Parent Chat Chaining) ──────────────────────
-console.log('\n6. Scroll Containment & Wheel Guard:');
+// ── TEST 6: Scroll Containment & Mouse-Wheel Functionality ──────────────────
+console.log('\n6. Scroll Containment & Mouse-Wheel Usability:');
 
 try {
   const preRule = chatCss.match(/\.code-block-pre\s*\{([\s\S]*?)\}/)?.[1] || '';
@@ -397,11 +401,11 @@ try {
   assert.ok(preRule.includes('overscroll-behavior-y: contain'), '.code-block-pre has overscroll-behavior-y: contain');
   assert.ok(preRule.includes('overscroll-behavior-x: contain'), '.code-block-pre has overscroll-behavior-x: contain');
 
-  // Verify JS wheel guard exists in chat.js
-  assert.ok(chatJs.includes("messagesArea.addEventListener('wheel'"), 'messagesArea has wheel event listener');
-  assert.ok(chatJs.includes('.code-block-pre') && chatJs.includes('e.preventDefault()'), 'Wheel listener prevents bubbling at code boundaries');
+  // Verify CSS hover styles highlight scrollbars for high visibility and immediate usability
+  assert.ok(chatCss.includes('.code-block:hover .code-block-pre::-webkit-scrollbar-thumb'), 'Scrollbar highlights on code block hover');
+  assert.ok(chatCss.includes('.code-block-pre::-webkit-scrollbar-thumb:hover'), 'Scrollbar thumb supports interactive drag state');
 
-  pass('overscroll-behavior: contain and boundary wheel guard prevent unintentional chat scrolling');
+  pass('overscroll-behavior: contain isolates code scroll; hover highlight ensures visible & usable scrollbar');
 } catch (err) {
   fail('Scroll Containment', err);
 }
