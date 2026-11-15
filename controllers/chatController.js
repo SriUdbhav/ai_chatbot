@@ -25,6 +25,12 @@ const {
   getQualityImageModelName,
 } = require('../config/gemini');
 
+const {
+  understandAndRefinePrompt,
+  cleanUserPrompt,
+  classifyImageCategory,
+} = require('./imagePromptEngine');
+
 // In-memory image cache to eliminate duplicate network calls and provide sub-second responses for repeated queries
 const imageMemoryCache = new Map();
 const MAX_IMAGE_CACHE_SIZE = 30;
@@ -440,7 +446,7 @@ async function handleGeminiError(res, err, ai, history, userMessage, mode = 'sta
 exports.postGenerateImage = async (req, res) => {
   // Stage 2: Backend request received
   const t_backend_recv = Date.now();
-  const { prompt, mode = 'fast', clientTimestamp } = req.body || {};
+  const { prompt, mode = 'fast', clientTimestamp, fresh = false } = req.body || {};
   const t_user_submit = (typeof clientTimestamp === 'number' && clientTimestamp > 0)
     ? clientTimestamp
     : t_backend_recv;
@@ -465,35 +471,39 @@ exports.postGenerateImage = async (req, res) => {
   const validMode = (mode === 'quality') ? 'quality' : 'fast';
   const resolution = validMode === 'quality' ? '1024x1024' : '512x512';
 
-  // Check in-memory LRU cache for instant repeat generation (< 5ms)
+  // Check in-memory LRU cache for instant repeat generation (< 5ms) unless explicitly fresh
   const cacheKey = `${validMode}:${trimmedPrompt.toLowerCase()}`;
-  const cached = getCachedImage(cacheKey);
-  if (cached) {
-    const t_extract_end = Date.now();
-    return res.json({
-      status:      'success',
-      imageBase64: cached.imageBase64,
-      mimeType:    cached.mimeType,
-      prompt:      trimmedPrompt,
-      model:       cached.model,
-      engine:      cached.engine + ' (Instant Cache)',
-      mode:        validMode,
-      resolution:  cached.resolution,
-      cached:      true,
-      timestamps: {
-        userSubmit:  t_user_submit,
-        backendRecv: t_backend_recv,
-        apiStart:    t_backend_recv,
-        apiEnd:      t_extract_end,
-        extractEnd:  t_extract_end,
-      },
-      durations: {
-        clientToBackendMs: Math.max(0, t_backend_recv - t_user_submit),
-        apiProcessingMs:   0,
-        backendExtractMs:  0,
-        backendTotalMs:    Math.max(0, t_extract_end - t_backend_recv),
-      },
-    });
+  if (!fresh) {
+    const cached = getCachedImage(cacheKey);
+    if (cached) {
+      const t_extract_end = Date.now();
+      return res.json({
+        status:        'success',
+        imageBase64:   cached.imageBase64,
+        mimeType:      cached.mimeType,
+        prompt:        trimmedPrompt,
+        refinedPrompt: cached.refinedPrompt || trimmedPrompt,
+        category:      cached.category || 'general_realistic',
+        model:         cached.model,
+        engine:        cached.engine + ' (Instant Cache)',
+        mode:          validMode,
+        resolution:    cached.resolution,
+        cached:        true,
+        timestamps: {
+          userSubmit:  t_user_submit,
+          backendRecv: t_backend_recv,
+          apiStart:    t_backend_recv,
+          apiEnd:      t_extract_end,
+          extractEnd:  t_extract_end,
+        },
+        durations: {
+          clientToBackendMs: Math.max(0, t_backend_recv - t_user_submit),
+          apiProcessingMs:   0,
+          backendExtractMs:  0,
+          backendTotalMs:    Math.max(0, t_extract_end - t_backend_recv),
+        },
+      });
+    }
   }
 
   if (!isApiKeyConfigured()) {
@@ -513,28 +523,34 @@ exports.postGenerateImage = async (req, res) => {
     });
   }
 
+  // Stage 2.5: Accurate Prompt Understanding & Enhancement
+  const promptAnalysis = await understandAndRefinePrompt(ai, trimmedPrompt, validMode);
+  const refinedPrompt = promptAnalysis.refinedPrompt || trimmedPrompt;
+
   const preferredModel = getImageModelName(validMode);
   const fallbackModel = getFallbackImageModelName();
 
-  // Stage 3: Gemini API request started
+  // Stage 3: Image generation request started
   const t_gemini_start = Date.now();
 
   try {
-    let result = await attemptGenerateImage(ai, preferredModel, trimmedPrompt, validMode);
+    let result = await attemptGenerateImage(ai, preferredModel, refinedPrompt, validMode);
 
     if (result && result.imageBase64) {
-      // Stage 4: Gemini API response received & Stage 5: Extraction complete
+      // Stage 4: API response received & Stage 5: Extraction complete
       const t_gemini_end = Date.now();
       const t_extract_end = Date.now();
 
       const responsePayload = {
-        status:      'success',
-        imageBase64: result.imageBase64,
-        mimeType:    result.mimeType || 'image/png',
-        prompt:      trimmedPrompt,
-        model:       result.modelUsed || preferredModel,
-        engine:      'Gemini Image',
-        mode:        validMode,
+        status:        'success',
+        imageBase64:   result.imageBase64,
+        mimeType:      result.mimeType || 'image/png',
+        prompt:        trimmedPrompt,
+        refinedPrompt: refinedPrompt,
+        category:      promptAnalysis.category,
+        model:         result.modelUsed || preferredModel,
+        engine:        'Gemini Image',
+        mode:          validMode,
         resolution,
         timestamps: {
           userSubmit:  t_user_submit,
@@ -556,19 +572,21 @@ exports.postGenerateImage = async (req, res) => {
     }
 
     // If Gemini model returned without inline image data, fulfill via AI Diffusion engine
-    console.log('[Image Service] Gemini model returned no image bytes. Fulfilling via AI Diffusion engine...');
-    const diffusion = await generateViaDiffusionEngine(trimmedPrompt, validMode);
+    console.log('[Image Service] Gemini model returned no image bytes. Fulfilling via AI Diffusion engine with refined prompt...');
+    const diffusion = await generateViaDiffusionEngine(refinedPrompt, validMode);
     const t_gemini_end = Date.now();
     const t_extract_end = Date.now();
 
     const responsePayload = {
-      status:      'success',
-      imageBase64: diffusion.imageBase64,
-      mimeType:    diffusion.mimeType,
-      prompt:      trimmedPrompt,
-      model:       validMode === 'quality' ? 'Stable Diffusion XL (High Detail)' : 'Fast Diffusion (Turbo 512)',
-      engine:      'AI Image Diffusion',
-      mode:        validMode,
+      status:        'success',
+      imageBase64:   diffusion.imageBase64,
+      mimeType:      diffusion.mimeType,
+      prompt:        trimmedPrompt,
+      refinedPrompt: refinedPrompt,
+      category:      promptAnalysis.category,
+      model:         validMode === 'quality' ? 'Flux.1 Diffusion (High Detail)' : 'Flux.1 Diffusion (Fast 512)',
+      engine:        'AI Image Diffusion (Flux.1)',
+      mode:          validMode,
       resolution,
       timestamps: {
         userSubmit:  t_user_submit,
@@ -595,22 +613,24 @@ exports.postGenerateImage = async (req, res) => {
     // When Gemini Free Tier has 0 quota for image models (QUOTA_EXCEEDED_FREE_TIER),
     // immediately generate real image via AI Diffusion engine fallback without slow retries
     if (isQuotaZero) {
-      console.log('[Image Service] Gemini Free Tier image quota is 0. Generating real image via online AI Diffusion engine...');
+      console.log('[Image Service] Gemini Free Tier image quota is 0. Generating real image via online AI Diffusion engine with refined prompt...');
       try {
-        const diffusion = await generateViaDiffusionEngine(trimmedPrompt, validMode);
+        const diffusion = await generateViaDiffusionEngine(refinedPrompt, validMode);
         const t_gemini_end = Date.now();
         const t_extract_end = Date.now();
 
         const responsePayload = {
-          status:      'success',
-          imageBase64: diffusion.imageBase64,
-          mimeType:    diffusion.mimeType,
-          prompt:      trimmedPrompt,
-          model:       validMode === 'quality' ? 'Stable Diffusion XL (High Detail)' : 'Fast Diffusion (Turbo 512)',
-          engine:      'AI Image Diffusion (Gemini Free Tier Quota Fallback)',
-          mode:        validMode,
+          status:        'success',
+          imageBase64:   diffusion.imageBase64,
+          mimeType:      diffusion.mimeType,
+          prompt:        trimmedPrompt,
+          refinedPrompt: refinedPrompt,
+          category:      promptAnalysis.category,
+          model:         validMode === 'quality' ? 'Flux.1 Diffusion (High Detail)' : 'Flux.1 Diffusion (Fast 512)',
+          engine:        'AI Image Diffusion (Flux.1)',
+          mode:          validMode,
           resolution,
-          note:        'Google AI Studio Free Tier has a quota limit of 0 for image generation. Fulfilled seamlessly using AI Image Diffusion.',
+          note:          'Google AI Studio Free Tier has a quota limit of 0 for direct image models. Accurately fulfilled using Flux.1 Diffusion with prompt understanding.',
           timestamps: {
             userSubmit:  t_user_submit,
             backendRecv: t_backend_recv,
@@ -638,6 +658,11 @@ exports.postGenerateImage = async (req, res) => {
             retryAfter: diffErr.retryAfter || 30,
           });
         }
+        return res.status(502).json({
+          status:  'error',
+          code:    'DIFFUSION_SERVICE_ERROR',
+          message: diffErr.message || 'Image generation service temporarily unavailable.',
+        });
       }
     }
 
@@ -647,75 +672,100 @@ exports.postGenerateImage = async (req, res) => {
 
 /**
  * Generates an actual AI image via the high-performance online AI Diffusion engine.
- * Supports FAST MODE (512x512 preview, sub-second) and QUALITY MODE (1024x1024 high detail).
+ * Uses official Flux.1 Diffusion for unmatched prompt fidelity.
+ * Supports FAST MODE (512x512 preview) and QUALITY MODE (1024x1024 high detail).
  */
-async function generateViaDiffusionEngine(prompt, mode = 'fast') {
+async function generateViaDiffusionEngine(prompt, mode = 'fast', seed = null) {
   const isQuality = mode === 'quality';
   const width = isQuality ? 1024 : 512;
   const height = isQuality ? 1024 : 512;
-  const clean = prompt.slice(0, 300);
-  const encoded = encodeURIComponent(clean);
-  const seed = Math.floor(Math.random() * 10000000);
-  const timeoutMs = isQuality ? 15000 : 8000;
+  const encoded = encodeURIComponent(prompt.trim());
+  const chosenSeed = (typeof seed === 'number' && seed > 0) ? seed : Math.floor(Math.random() * 10000000);
+  const timeoutMs = isQuality ? 25000 : 15000;
 
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=${width}&height=${height}&nologo=true&seed=${seed}`;
+  const hosts = [
+    'https://image.pollinations.ai/prompt/',
+    'https://gen.pollinations.ai/image/'
+  ];
 
-  const res = await fetch(url, {
-    signal: AbortSignal.timeout(timeoutMs),
-    headers: {
-      'Accept': 'image/jpeg,image/png,image/*,*/*',
-    }
-  });
+  let lastError = null;
 
-  if (!res.ok) {
-    if (res.status === 402 || res.status === 429) {
-      let retryAfter = 30;
-      try {
-        const errJson = await res.json();
-        const m = (errJson?.error?.message || '').match(/after\s+(\d+)s/i);
-        if (m) retryAfter = parseInt(m[1], 10);
-      } catch (_) {}
+  for (const host of hosts) {
+    const url = `${host}${encoded}?model=flux&width=${width}&height=${height}&nologo=true&enhance=false&seed=${chosenSeed}`;
 
-      // If cooldown is within 45 seconds, automatically wait and retry once
-      if (retryAfter <= 45) {
-        console.log(`[Image Service] Diffusion free rate limit: waiting ${retryAfter + 1}s cooldown before auto-retry...`);
-        await new Promise(r => setTimeout(r, (retryAfter + 1) * 1000));
-        try {
-          const retryRes = await fetch(url, {
-            signal: AbortSignal.timeout(timeoutMs),
-            headers: { 'Accept': 'image/jpeg,image/png,image/*,*/*' }
-          });
-          if (retryRes.ok) {
-            const retryBuf = await retryRes.arrayBuffer();
-            if (retryBuf.byteLength >= 500) {
-              return {
-                imageBase64: Buffer.from(retryBuf).toString('base64'),
-                mimeType: retryRes.headers.get('content-type') || 'image/jpeg',
-              };
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(timeoutMs),
+        headers: {
+          'Accept': 'image/jpeg,image/png,image/*,*/*',
+          'User-Agent': 'StudyMateAI/2.0 (High-Fidelity Image Pipeline)'
+        }
+      });
+
+      if (!res.ok) {
+        if (res.status === 402 || res.status === 429) {
+          let retryAfter = 30;
+          try {
+            const errJson = await res.json();
+            const m = (errJson?.error?.message || '').match(/after\s+(\d+)s/i);
+            if (m) retryAfter = parseInt(m[1], 10);
+          } catch (_) {}
+
+          // If cooldown is brief (<= 15 seconds), wait and auto-retry once
+          if (retryAfter <= 15) {
+            console.log(`[Image Service] Diffusion free rate limit: waiting ${retryAfter + 1}s cooldown before auto-retry...`);
+            await new Promise(r => setTimeout(r, (retryAfter + 1) * 1000));
+            try {
+              const retryRes = await fetch(url, {
+                signal: AbortSignal.timeout(timeoutMs),
+                headers: { 'Accept': 'image/jpeg,image/png,image/*,*/*' }
+              });
+              if (retryRes.ok) {
+                const retryBuf = await retryRes.arrayBuffer();
+                if (retryBuf.byteLength >= 1000) {
+                  return {
+                    imageBase64: Buffer.from(retryBuf).toString('base64'),
+                    mimeType: retryRes.headers.get('content-type') || 'image/jpeg',
+                    modelUsed: 'Flux.1 Diffusion'
+                  };
+                }
+              }
+            } catch (retryErr) {
+              console.warn('[Image Service] Auto-retry after cooldown failed:', retryErr.message);
             }
           }
-        } catch (retryErr) {
-          console.warn('[Image Service] Auto-retry after cooldown failed:', retryErr.message);
+
+          const err = new Error(`Image service rate limit reached. Please retry in ${retryAfter} seconds.`);
+          err.code = 'RATE_LIMIT_COOLDOWN';
+          err.retryAfter = retryAfter;
+          throw err;
         }
+        throw new Error(`AI Diffusion engine returned HTTP ${res.status}`);
       }
 
-      const err = new Error(`Image service rate limit reached. Please retry in ${retryAfter} seconds.`);
-      err.code = 'RATE_LIMIT_COOLDOWN';
-      err.retryAfter = retryAfter;
-      throw err;
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('image')) {
+        throw new Error(`Invalid content type returned: ${contentType}`);
+      }
+
+      const buffer = await res.arrayBuffer();
+      if (buffer.byteLength < 1000) {
+        throw new Error('AI Diffusion returned an incomplete image buffer.');
+      }
+
+      return {
+        imageBase64: Buffer.from(buffer).toString('base64'),
+        mimeType: contentType || 'image/jpeg',
+        modelUsed: 'Flux.1 Diffusion'
+      };
+    } catch (err) {
+      lastError = err;
+      if (err.code === 'RATE_LIMIT_COOLDOWN') throw err;
+      console.warn(`[Image Service] Host ${host} failed: ${err.message}. Trying backup host...`);
     }
-    throw new Error(`AI Diffusion engine returned HTTP ${res.status}`);
   }
 
-  const buffer = await res.arrayBuffer();
-  if (buffer.byteLength < 500) {
-    throw new Error('AI Diffusion returned an incomplete image buffer.');
-  }
-
-  return {
-    imageBase64: Buffer.from(buffer).toString('base64'),
-    mimeType: res.headers.get('content-type') || 'image/jpeg',
-  };
+  throw lastError || new Error('All image diffusion providers failed.');
 }
 
 /**

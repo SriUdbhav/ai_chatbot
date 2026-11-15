@@ -1,0 +1,47 @@
+{
+  "topic": "recursion",
+  "title": "Recursion & Call Stack",
+  "syllabus_unit": "DS-ADV-2",
+  "syllabus_note": "Additional DS Concept (Foundational extension beyond prescribed lab syllabus)",
+  "definition": "Recursion is a programming technique where a function solves a computational problem by calling a copy of itself with a smaller subproblem until a terminating base case is reached.",
+  "principles": {
+    "base_case": "The condition under which the function terminates without making further recursive calls, preventing infinite recursion.",
+    "recursive_step": "The reduction step where the problem is broken down into one or more smaller instances of the same problem.",
+    "call_stack": "Each recursive call pushes an activation record (stack frame) onto the system call stack storing local variables and return addresses."
+  },
+  "c_program": "#include <stdio.h>\n\n// Classic Tower of Hanoi in C\n// Moves n disks from source rod to destination rod using auxiliary rod\nvoid towerOfHanoi(int n, char from_rod, char to_rod, char aux_rod) {\n    if (n == 1) {\n        printf(\"Move disk 1 from rod %c to rod %c\\n\", from_rod, to_rod);\n        return;\n    }\n    // Step 1: Move n-1 disks from source to aux using dest\n    towerOfHanoi(n - 1, from_rod, aux_rod, to_rod);\n    // Step 2: Move nth disk from source to dest\n    printf(\"Move disk %d from rod %c to rod %c\\n\", n, from_rod, to_rod);\n    // Step 3: Move n-1 disks from aux to dest using source\n    towerOfHanoi(n - 1, aux_rod, to_rod, from_rod);\n}\n\nint main(void) {\n    int n = 3; // Number of disks\n    printf(\"--- Tower of Hanoi Solution for n = %d disks ---\\n\", n);\n    towerOfHanoi(n, 'A', 'C', 'B');\n    printf(\"Total moves required: 7\\n\");\n    return 0;\n}",
+  "sample_io": "Output:\n--- Tower of Hanoi Solution for n = 3 disks ---\nMove disk 1 from rod A to rod C\nMove disk 2 from rod A to rod B\nMove disk 1 from rod C to rod B\nMove disk 3 from rod A to rod C\nMove disk 1 from rod B to rod A\nMove disk 2 from rod B to rod C\nMove disk 1 from rod A to rod C\nTotal moves required: 7",
+  "dry_run": [
+    "Initial: n = 3 disks on Rod A, Destination Rod C, Auxiliary Rod B.",
+    "Call 1: towerOfHanoi(3, A, C, B)",
+    "  Subcall 1.1: towerOfHanoi(2, A, B, C)",
+    "    Subcall 1.1.1: towerOfHanoi(1, A, C, B) -> Move disk 1 from A to C",
+    "    Move disk 2 from rod A to rod B",
+    "    Subcall 1.1.2: towerOfHanoi(1, C, B, A) -> Move disk 1 from C to B",
+    "  Move disk 3 from rod A to rod C",
+    "  Subcall 1.2: towerOfHanoi(2, B, C, A)",
+    "    Subcall 1.2.1: towerOfHanoi(1, B, A, C) -> Move disk 1 from B to A",
+    "    Move disk 2 from rod B to rod C",
+    "    Subcall 1.2.2: towerOfHanoi(1, A, C, B) -> Move disk 1 from A to C",
+    "All 3 disks moved to Rod C in exactly 2^3 - 1 = 7 steps."
+  ],
+  "time_complexity": "O(2^n) exponential time (T(n) = 2T(n-1) + 1).",
+  "space_complexity": "O(n) auxiliary call stack space proportional to the maximum recursion depth.",
+  "applications": [
+    "Divide and Conquer algorithms (Merge Sort, Quick Sort)",
+    "Tree Traversals (Inorder, Preorder, Postorder)",
+    "Graph DFS and Backtracking (N-Queens, Sudoku solver, Maze pathfinding)",
+    "Mathematical evaluation (Factorial, Fibonacci, GCD)"
+  ],
+  "viva_questions": [
+    {
+      "question": "What happens if a recursive function does not have a base case?",
+      "answer": "The function calls itself indefinitely until the system runtime stack exhausts its allocated memory, causing a fatal Stack Overflow exception or segmentation fault."
+    },
+    {
+      "question": "How many total moves are required to solve Tower of Hanoi for n disks?",
+      "answer": "2^n - 1 moves. For n = 3 disks, exactly 7 moves are required; for n = 4, 15 moves are required."
+    }
+  ]
+}
+

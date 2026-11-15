@@ -5,8 +5,8 @@
 
 'use strict';
 
-// History: CACHE_VERSION = 'v1.2.0', CACHE_VERSION = 'v1.2.1', CACHE_VERSION = 'v1.4.0'
-const CACHE_VERSION = 'v1.5.0';
+// History: CACHE_VERSION = 'v1.2.0', CACHE_VERSION = 'v1.2.1', CACHE_VERSION = 'v1.4.0', CACHE_VERSION = 'v1.5.0'
+const CACHE_VERSION = 'v1.6.0';
 const STATIC_CACHE = `studymate-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `studymate-runtime-${CACHE_VERSION}`;
 
@@ -38,6 +38,8 @@ const PRECACHE_ASSETS = [
   '/knowledge/data-structures/binary-trees.json',
   '/knowledge/data-structures/graphs.json',
   '/knowledge/data-structures/hashing.json',
+  '/knowledge/data-structures/heaps.json',
+  '/knowledge/data-structures/recursion.json',
   '/knowledge/data-structures/complexity.json',
   '/knowledge/data-structures/viva.json',
   '/manifest.webmanifest',

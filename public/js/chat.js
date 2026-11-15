@@ -1729,8 +1729,8 @@ function generateFollowupChipsHtml(msg) {
 
 function renderImageMessageHtml(msg) {
   const safePrompt = escapeHtml(msg.prompt || 'Generated Visual');
-  const safeEngine = escapeHtml(msg.engine || 'Gemini Image');
-  const safeModel = escapeHtml(msg.model || 'gemini-3.1-flash-lite-image');
+  const safeEngine = escapeHtml(msg.engine || 'AI Image Diffusion');
+  const safeModel = escapeHtml(msg.model || 'Flux.1 Diffusion');
 
   const tel = msg.telemetry;
   const isFast = (msg.mode || tel?.mode) !== 'quality';
@@ -1754,16 +1754,51 @@ function renderImageMessageHtml(msg) {
       <div class="image-card-preview-wrap">
         <div class="image-skeleton" id="skeleton_${msg.imageId}">
           <div class="skeleton-shimmer"></div>
-          <div class="skeleton-text">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="spin-icon"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
-            Generating visual rendering…
+          <div class="image-progress-card">
+            <div class="progress-card-top">
+              <div class="progress-spinner-wrap">
+                <svg class="progress-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="12" cy="12" r="9" stroke-opacity="0.25"></circle>
+                  <path d="M12 3a9 9 0 0 1 9 9" stroke-linecap="round"></path>
+                </svg>
+                <span class="progress-pct-badge" id="pct_${msg.imageId}">0%</span>
+              </div>
+              <span class="progress-est-pill" title="Estimated timeline: Diffusion synthesizes over HTTP without streaming intermediate steps">Estimated Progress</span>
+            </div>
+            <div class="image-progress-bar-track">
+              <div class="image-progress-bar-fill" id="pbar_${msg.imageId}" style="width: 0%;"></div>
+            </div>
+            <div class="image-progress-stage" id="stage_${msg.imageId}">0% — Preparing request…</div>
+            <div class="image-progress-actions">
+              <button type="button" class="img-cancel-btn" data-cancel-id="${msg.imageId}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <span>Cancel</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="image-error-card" id="error_${msg.imageId}" style="display:none;">
+          <div class="image-error-icon">⚠️</div>
+          <div class="image-error-title" id="err_title_${msg.imageId}">Generation Failed</div>
+          <div class="image-error-desc" id="err_desc_${msg.imageId}">An error occurred while generating the image.</div>
+          <div class="image-error-actions">
+            <button type="button" class="img-retry-btn" data-retry-prompt="${safePrompt}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Retry Generation</span>
+            </button>
           </div>
         </div>
         <img class="generated-img" id="img_${msg.imageId}" alt="${safePrompt}" style="display:none;" />
       </div>
       <div class="image-card-caption">
-        <div class="image-prompt-label">Prompt</div>
+        <div class="image-prompt-label">Original Prompt</div>
         <p class="image-prompt-text">${safePrompt}</p>
+        ${msg.refinedPrompt && msg.refinedPrompt !== msg.prompt ? `
+          <div class="image-refined-prompt-block">
+            <div class="image-refined-label">Understood Visual Subject & Styling</div>
+            <p class="image-refined-text">${escapeHtml(msg.refinedPrompt)}</p>
+          </div>
+        ` : ''}
       </div>
       <div class="image-card-actions">
         <button type="button" class="img-action-btn copy-img-btn" data-img-id="${msg.imageId}" title="Copy Image to clipboard">
@@ -2487,7 +2522,27 @@ messagesArea.addEventListener('click', async (e) => {
     const prompt = regenImgBtn.dataset.prompt;
     if (prompt) {
       showToast('🔄 Regenerating image...', 'info');
-      handleImageGeneration(prompt);
+      handleImageGeneration(prompt, { fresh: true });
+    }
+    return;
+  }
+
+  const cancelImgBtn = e.target.closest('.img-cancel-btn');
+  if (cancelImgBtn) {
+    if (typeof activeImageAbortController !== 'undefined' && activeImageAbortController) {
+      activeImageAbortController.abort();
+      activeImageAbortController = null;
+    }
+    showToast('Image generation cancelled.', 'info');
+    return;
+  }
+
+  const retryImgBtn = e.target.closest('.img-retry-btn');
+  if (retryImgBtn) {
+    const prompt = retryImgBtn.dataset.retryPrompt;
+    if (prompt) {
+      showToast('Retrying image generation...', 'info');
+      handleImageGeneration(prompt, { fresh: true });
     }
     return;
   }
@@ -3275,9 +3330,12 @@ if (chatForm) {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   DEDICATED IMAGE GENERATION INTENT DETECTOR & ROUTER (PART 2)
+   DEDICATED IMAGE GENERATION INTENT DETECTOR & ROUTER (PHASE 5 UPGRADE)
 ───────────────────────────────────────────────────────────────── */
-const IMAGE_NOUNS = 'image|picture|photo|photograph|illustration|drawing|artwork|wallpaper|poster|graphic|sketch|portrait|visual|cartoon|render|painting|banner';
+const IMAGE_NOUNS = 'image|picture|photo|photograph|illustration|drawing|artwork|wallpaper|poster|graphic|sketch|portrait|visual|visualization|cartoon|render|painting|banner|diagram|flowchart|infographic|landscape|scenery|logo|icon|avatar|blueprint';
+const VISUAL_SUBJECTS = 'car|sports car|supercar|vehicle|motorcycle|jet|passenger jet|plane|airplane|truck|fire truck|mountain|mountains|landscape|forest|beach|ocean|river|lake|sunset|sunrise|dog|puppy|retriever|cat|kitten|animal|bird|eagle|bald eagle|fish|clownfish|coral|student|doctor|astronaut|developer|building|interior|room|coffee shop|city|street|flower|sky|patterns|fractal|acrylic|watercolor';
+
+let activeImageAbortController = null;
 
 function isImageGenerationIntent(text) {
   if (!text || typeof text !== 'string') return false;
@@ -3286,25 +3344,52 @@ function isImageGenerationIntent(text) {
   // 1. Explicit slash command
   if (/^\/image\s+/i.test(t)) return true;
 
-  // 2. Negative guards: user asking for code, programming, explanation, theory, or reading
-  const hasCodeOrExplain = /\b(code|python|script|programming\s+language|html|css|svg|function|algorithm|opencv|canvas|pil|pillow|matplotlib)\b/i.test(t) ||
-                           /\b(explain|how\s+to|how\s+does|how\s+do|what\s+is|tell\s+me\s+about|describe\s+how|difference\s+between|tutorial|history\s+of|why\s+do)\b/i.test(t) ||
-                           /\b(read|analyze|describe|summarize|extract|transcribe|what\s+is\s+in)\s+(this|the|attached)\s+(image|picture|photo)\b/i.test(t);
+  // 2. Strict negative guards: code, programming, explanations, text answers
+  const hasCodeOrExplain = /\b(code|python|script|programming\s+language|html|css|svg|function|opencv|canvas|pil|pillow|matplotlib|write\s+a\s+program|c\s+program|algorithm\s+to)\b/i.test(t) ||
+                           /\b(explain|how\s+to|how\s+does|how\s+do|what\s+is|what\s+are|tell\s+me\s+about|describe\s+how|difference\s+between|tutorial|history\s+of|why\s+do|why\s+does|why\s+is|solve|derive)\b/i.test(t) ||
+                           /\b(read|analyze|describe|summarize|extract|transcribe|what\s+is\s+in)\s+(this|the|attached)\s+(image|picture|photo)\b/i.test(t) ||
+                           (/\?\s*$/.test(t) && !/^(can\s+you|could\s+you|please)\s+(generate|create|draw|paint|render|make|illustrate)\b/i.test(t));
   if (hasCodeOrExplain) return false;
 
-  // 3. Positive intent matching
-  const p1 = new RegExp(`\\b(generate|create|draw|paint|make|produce|render|illustrate)\\s+(me\\s+)?(a|an|the|some)?\\s*([a-z0-9_-]+\\s+){0,3}(${IMAGE_NOUNS})\\b`, 'i');
+  // 3. Positive intent matching with image nouns
+  const p1 = new RegExp(`\\b(generate|create|draw|paint|make|produce|render|illustrate|sketch)\\s+(me\\s+)?(a|an|the|some)?\\s*([a-z0-9_-]+\\s+){0,4}(${IMAGE_NOUNS})\\b`, 'i');
   if (p1.test(t)) return true;
 
-  if (/^\s*(draw|paint|sketch|illustrate)\s+(a|an|the|me)\s+/i.test(t)) return true;
+  // 4. Starts with draw/paint/sketch/illustrate/render
+  if (/^\s*(draw|paint|sketch|illustrate|render)\s+(a|an|the|me|some)\s+/i.test(t)) return true;
 
-  const p2 = new RegExp(`\\b(can\\s+you|please|could\\s+you)\\s+(generate|create|draw|paint|make|render|illustrate)\\s+(me\\s+)?(an?|the)?\\s*([a-z0-9_-]+\\s+){0,2}(${IMAGE_NOUNS})\\b`, 'i');
+  // 5. 'Can you generate/draw/render ...'
+  const p2 = new RegExp(`\\b(can\\s+you|please|could\\s+you)\\s+(generate|create|draw|paint|make|render|illustrate)\\s+(me\\s+)?(an?|the)?\\s*([a-z0-9_-]+\\s+){0,3}(${IMAGE_NOUNS})\\b`, 'i');
   if (p2.test(t)) return true;
+
+  // 6. Direct generation of visual subjects: 'generate a [realistic] [red sports car / mountain landscape]'
+  const p3 = new RegExp(`\\b(generate|create|draw|paint|render|illustrate|make)\\s+(me\\s+)?(a|an|the|some)?\\s*(realistic\\s+|cinematic\\s+|detailed\\s+|beautiful\\s+)?([a-z0-9_-]+\\s+){0,3}(${VISUAL_SUBJECTS})\\b`, 'i');
+  if (p3.test(t)) return true;
+
+  // 7. Explicit standalone image nouns (diagram, flowchart, logo, painting, illustration, infographic, visualization)
+  if (/\b(diagram|flowchart|infographic|illustration|drawing|sketch|painting|artwork|wallpaper|visualization|logo)\b/i.test(t)) return true;
+
+  // 8. Art style / pattern descriptions (abstract fluid acrylic, geometric fractal patterns, surreal watercolor)
+  if (/^(abstract|geometric|surreal|minimalist)\s+([a-z0-9_-]+\s+){0,3}(patterns?|art|painting|render|lines?|shapes?|illustration)\b/i.test(t)) return true;
+
+  // 9. Descriptive visual scenes starting with A / An / The + setting / scene prepositions / participles
+  // e.g. 'A cozy coffee shop interior with warm lighting...', 'A vintage motorcycle parked on cobblestone', 'An astronaut floating in space...'
+  if (/^\s*(a|an|the)\s+([a-z0-9_-]+\s+){1,7}(with|under|at|in|on|near|perched\s+on|sitting\s+in|floating\s+in|swimming\s+near|parked\s+on|flying\s+through|coding\s+with|smiling\s+in)\s+/i.test(t)) {
+    return true;
+  }
 
   return false;
 }
 
-async function handleImageGeneration(rawPrompt) {
+async function handleImageGeneration(rawPrompt, options = {}) {
+  const isFresh = Boolean(options && options.fresh);
+
+  // Prevent duplicate concurrent requests
+  if (state.isWaiting) {
+    showToast('An image or AI generation request is already in progress.', 'warning');
+    return;
+  }
+
   let cleanPrompt = (rawPrompt || '').replace(/^\/image\s+/i, '').trim();
   if (!cleanPrompt) {
     cleanPrompt = 'A detailed academic diagram explaining key concepts';
@@ -3323,16 +3408,18 @@ async function handleImageGeneration(rawPrompt) {
   updateComposerButtons();
 
   const now = Date.now();
-  const userMsg = {
-    id: generateId('msg'),
-    role: 'user',
-    content: rawPrompt.startsWith('/') ? rawPrompt : `/image ${cleanPrompt}`,
-    attachments: [],
-    timestamp: now,
-    time: formatTime(now),
-    isError: false,
-  };
-  appendMessageToActive(userMsg);
+  if (!isFresh) {
+    const userMsg = {
+      id: generateId('msg'),
+      role: 'user',
+      content: rawPrompt.startsWith('/') ? rawPrompt : `/image ${cleanPrompt}`,
+      attachments: [],
+      timestamp: now,
+      time: formatTime(now),
+      isError: false,
+    };
+    appendMessageToActive(userMsg);
+  }
 
   // Check offline or local preference
   const localAi = await getLocalAI();
@@ -3342,7 +3429,6 @@ async function handleImageGeneration(rawPrompt) {
   const requiresLocal = enginePref === 'local' || (!isOnline && enginePref === 'auto');
 
   if (requiresLocal) {
-    // Part 2.4: Clear offline message. WebLLM cannot directly produce images.
     const archHtml = `
       <div class="ai-architecture-card">
         <div class="arch-card-header">
@@ -3350,22 +3436,7 @@ async function handleImageGeneration(rawPrompt) {
           <span class="arch-engine">WebLLM vs. Diffusion</span>
         </div>
         <div class="arch-card-body">
-          <p><strong>Offline image generation is not available.</strong> Download a compatible local image model or reconnect to use online image generation.</p>
-          <div class="arch-specs-grid">
-            <div class="arch-spec-item">
-              <span class="spec-label">Active Engine</span>
-              <span class="spec-value">WebLLM (Text Generation)</span>
-            </div>
-            <div class="arch-spec-item">
-              <span class="spec-label">Local Image Model</span>
-              <span class="spec-value status-unloaded">Not Downloaded (~1.8 GB – 2.4 GB Web-SD)</span>
-            </div>
-            <div class="arch-spec-item">
-              <span class="spec-label">Hardware Requirements</span>
-              <span class="spec-value">WebGPU Stable Diffusion (4GB+ VRAM required)</span>
-            </div>
-          </div>
-          <p class="arch-consent-note">💡 WebLLM is an on-device Large Language Model runtime optimized for text, code explanations, and step-by-step reasoning. Local WebGPU Stable Diffusion diffusion weights (~1.8 GB – 2.4 GB) will never be downloaded silently without your explicit permission.</p>
+          <p><strong>Offline image generation is not available.</strong> WebLLM operates as an on-device Large Language Model for text, code explanations, and structured exam knowledge. Image synthesis requires online diffusion.</p>
         </div>
         <div class="arch-card-footer">
           <button type="button" class="arch-action-btn" onclick="if(window.openSettingsModal) window.openSettingsModal(); else { const s=document.getElementById('settingsModal'); if(s) s.removeAttribute('hidden'); }">
@@ -3390,35 +3461,105 @@ async function handleImageGeneration(rawPrompt) {
     return;
   }
 
-  // Online Image generation
+  // Online Image generation setup
   const aiMsgId = generateId('msg');
   const imgId = 'img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
   const currentMode = state.imageGenMode || 'fast';
   const t_user_submit = Date.now();
 
-  // Render placeholder message with skeleton
+  activeImageAbortController = new AbortController();
+
+  // Render placeholder message with skeleton and progress widgets
   const placeholderMsg = {
     id: aiMsgId,
     role: 'model',
     type: 'image',
     imageId: imgId,
     prompt: cleanPrompt,
-    engine: 'Gemini Image',
-    model: currentMode === 'quality' ? 'gemini-3.1-flash-image' : 'gemini-3.1-flash-lite-image',
+    engine: 'AI Image Diffusion',
+    model: currentMode === 'quality' ? 'Flux.1 Diffusion (High Detail)' : 'Flux.1 Diffusion (Fast 512)',
     mode: currentMode,
     timestamp: Date.now(),
     time: formatTime(),
   };
   appendMessageToActive(placeholderMsg);
 
+  // ── Progress Stage Controller (Phase 5 Technical Requirement) ──
+  // Display clean estimated progress:
+  // 0% — Preparing request
+  // 10% — Understanding image prompt
+  // 20% — Preparing generation
+  // 30–85% — Generating image
+  // 90% — Processing generated image
+  // 95% — Finalizing image
+  // 100% — Image generated successfully (Only after DOM <img> load!)
+  let currentPct = 0;
+  let progressTimer = null;
+
+  function updateProgress(pct, stageDesc) {
+    currentPct = pct;
+    const pctEl = document.getElementById(`pct_${imgId}`);
+    const pbarEl = document.getElementById(`pbar_${imgId}`);
+    const stageEl = document.getElementById(`stage_${imgId}`);
+    if (pctEl) pctEl.textContent = `${pct}%`;
+    if (pbarEl) pbarEl.style.width = `${pct}%`;
+    if (stageEl) stageEl.textContent = `${pct}% — ${stageDesc}`;
+  }
+
+  updateProgress(0, 'Preparing request…');
+
+  const t1 = setTimeout(() => {
+    if (currentPct < 10) updateProgress(10, 'Understanding image prompt…');
+  }, 350);
+
+  const t2 = setTimeout(() => {
+    if (currentPct < 20) updateProgress(20, 'Preparing generation…');
+  }, 1100);
+
+  const t3 = setTimeout(() => {
+    if (currentPct < 30) updateProgress(30, 'Generating image…');
+    // Smooth progress simulation from 30% to 85%
+    progressTimer = setInterval(() => {
+      if (currentPct < 85) {
+        const step = currentPct < 60 ? 3 : (currentPct < 75 ? 2 : 1);
+        updateProgress(currentPct + step, 'Generating image…');
+      }
+    }, 380);
+  }, 2200);
+
+  function stopProgress() {
+    clearTimeout(t1);
+    clearTimeout(t2);
+    clearTimeout(t3);
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
+  }
+
+  function showErrorState(title, desc) {
+    const skelEl = document.getElementById(`skeleton_${imgId}`);
+    const errBox = document.getElementById(`error_${imgId}`);
+    const errTitle = document.getElementById(`err_title_${imgId}`);
+    const errDesc = document.getElementById(`err_desc_${imgId}`);
+    if (skelEl) skelEl.style.display = 'none';
+    if (errBox) {
+      if (errTitle) errTitle.textContent = title;
+      if (errDesc) errDesc.textContent = desc;
+      errBox.style.display = 'flex';
+    }
+  }
+
   try {
     const res = await fetch('/api/chat/generate-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: activeImageAbortController.signal,
       body: JSON.stringify({
         prompt: cleanPrompt,
         mode: currentMode,
         clientTimestamp: t_user_submit,
+        fresh: isFresh,
       }),
     });
 
@@ -3426,23 +3567,42 @@ async function handleImageGeneration(rawPrompt) {
     const t_browser_recv = Date.now();
 
     if (res.ok && data.status === 'success' && data.imageBase64) {
-      // Phase 4: Use high-efficiency Blob URL to render immediately without heavy Base64 DOM repaint freeze
+      stopProgress();
+      updateProgress(90, 'Processing generated image…');
+
       const blobUrl = base64ToBlobUrl(data.imageBase64, data.mimeType || 'image/jpeg');
       const dataUrl = `data:${data.mimeType || 'image/jpeg'};base64,${data.imageBase64}`;
       imageCache.set(imgId, dataUrl);
 
-      // Render image immediately
+      setTimeout(() => {
+        updateProgress(95, 'Finalizing image…');
+      }, 100);
+
+      // Render image element
       const imgEl = document.getElementById(`img_${imgId}`);
       const skelEl = document.getElementById(`skeleton_${imgId}`);
+
       if (imgEl) {
+        imgEl.onload = () => {
+          updateProgress(100, 'Image generated successfully');
+          setTimeout(() => {
+            if (skelEl) skelEl.style.display = 'none';
+            imgEl.style.display = 'block';
+          }, 200);
+        };
+        imgEl.onerror = () => {
+          stopProgress();
+          showErrorState('Image Display Error', 'The generated image payload could not be rendered in the browser.');
+        };
         imgEl.src = blobUrl;
-        imgEl.style.display = 'block';
+      } else {
+        stopProgress();
         if (skelEl) skelEl.style.display = 'none';
       }
-      const t_render_end = Date.now();
 
-      // Compute comprehensive 7-stage performance telemetry
+      const t_render_end = Date.now();
       const totalDurationMs = t_render_end - t_user_submit;
+
       const telemetry = {
         totalMs:           totalDurationMs,
         clientToBackendMs: data.durations?.clientToBackendMs || 0,
@@ -3460,8 +3620,9 @@ async function handleImageGeneration(rawPrompt) {
       if (convNow) {
         const target = convNow.messages.find(m => m.id === aiMsgId);
         if (target) {
-          target.engine = data.engine || 'Gemini Image';
-          target.model = data.model || (currentMode === 'quality' ? 'gemini-3.1-flash-image' : 'gemini-3.1-flash-lite-image');
+          target.engine = data.engine || 'AI Image Diffusion (Flux.1)';
+          target.model = data.model || (currentMode === 'quality' ? 'Flux.1 Diffusion (High Detail)' : 'Flux.1 Diffusion (Fast 512)');
+          target.refinedPrompt = data.refinedPrompt || cleanPrompt;
           target.telemetry = telemetry;
           target.mode = telemetry.mode;
           target.resolution = telemetry.resolution;
@@ -3486,49 +3647,47 @@ async function handleImageGeneration(rawPrompt) {
           telEl.title = breakdown;
           telEl.innerHTML = `<span class="telemetry-pill">${modeLabel}</span><span class="telemetry-time">${totalSec}</span>`;
         }
+
+        // Show refined prompt block if available
+        if (data.refinedPrompt && data.refinedPrompt !== cleanPrompt) {
+          const captionEl = document.querySelector(`.generated-image-card[data-img-id="${imgId}"] .image-card-caption`);
+          if (captionEl && !captionEl.querySelector('.image-refined-prompt-block')) {
+            const refinedDiv = document.createElement('div');
+            refinedDiv.className = 'image-refined-prompt-block';
+            refinedDiv.innerHTML = `
+              <div class="image-refined-label">Understood Visual Subject & Styling</div>
+              <p class="image-refined-text">${escapeHtml(data.refinedPrompt)}</p>
+            `;
+            captionEl.appendChild(refinedDiv);
+          }
+        }
       }
 
-      // Non-blocking IndexedDB persistence in the background
-      MediaDB.saveImage(imgId, dataUrl, data.mimeType, cleanPrompt, data.engine || 'Gemini Image').catch(console.warn);
-
+      MediaDB.saveImage(imgId, dataUrl, data.mimeType, cleanPrompt, data.engine || 'AI Image Diffusion (Flux.1)').catch(console.warn);
       showToast(`✨ Image generated in ${(totalDurationMs / 1000).toFixed(1)}s!`, 'success');
 
     } else {
-      let errText = `⚠️ **Image Generation Notice:** ${escapeHtml(data.message || 'Could not generate image.')}`;
-      if (data.code === 'QUOTA_EXCEEDED_FREE_TIER' || (data.message && data.message.includes('quota'))) {
-        errText = `⚠️ **Google AI Studio Free Tier Notice:** ${escapeHtml(data.message || 'Google AI Studio currently has a quota limit of 0 for image generation models on Free Tier accounts.')}`;
-      } else if (data.code === 'RATE_LIMIT_COOLDOWN') {
-        errText = `⚠️ **Service Rate Limit:** ${escapeHtml(data.message || 'Rate limit reached.')} Please wait a moment and try again.`;
+      stopProgress();
+      let errTitle = 'Generation Error';
+      let errDesc = data.message || 'Could not generate image.';
+      if (data.code === 'RATE_LIMIT_COOLDOWN') {
+        errTitle = 'Service Rate Limit';
+        errDesc = `Rate limit reached. Please wait ${data.retryAfter || 30}s before retrying.`;
       }
-      const convNow = state.conversations[state.activeId];
-      if (convNow) {
-        const target = convNow.messages.find(m => m.id === aiMsgId);
-        if (target) {
-          delete target.type;
-          delete target.imageId;
-          target.content = errText;
-          target.isError = true;
-        }
-        saveConversations();
-        renderMessages();
-      }
+      showErrorState(errTitle, errDesc);
     }
 
   } catch (err) {
-    console.error('Image generation request failed:', err);
-    const convNow = state.conversations[state.activeId];
-    if (convNow) {
-      const target = convNow.messages.find(m => m.id === aiMsgId);
-      if (target) {
-        delete target.type;
-        delete target.imageId;
-        target.content = `⚠️ **Network Error:** Could not contact server for image generation.`;
-        target.isError = true;
-      }
-      saveConversations();
-      renderMessages();
+    stopProgress();
+    if (err.name === 'AbortError') {
+      showErrorState('Generation Cancelled', 'Image generation was cancelled by the user.');
+    } else {
+      console.error('Image generation request failed:', err);
+      showErrorState('Network Error', 'Could not reach the server to complete image generation. Please check your connection.');
     }
   } finally {
+    stopProgress();
+    activeImageAbortController = null;
     state.isWaiting = false;
     updateComposerButtons();
   }

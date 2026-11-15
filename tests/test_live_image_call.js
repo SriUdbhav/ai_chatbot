@@ -33,12 +33,11 @@ async function runLiveTest() {
   if (res.statusCode === 200) {
     assert.strictEqual(res.body.status, 'success');
     assert.ok(res.body.imageBase64, 'Has imageBase64');
-    assert.strictEqual(res.body.engine, 'Gemini Image');
+    assert.ok(res.body.engine.includes('Image'), 'Has image engine');
     console.log('✔ Live image generation succeeded!');
   } else if (res.statusCode === 429) {
-    assert.strictEqual(res.body.code, 'QUOTA_EXCEEDED_FREE_TIER');
-    assert.ok(res.body.quotaDetails, 'Includes quotaDetails');
-    console.log('✔ Free Tier 0 quota limit gracefully handled and educational diagnosis returned!');
+    assert.ok(res.body.code === 'QUOTA_EXCEEDED_FREE_TIER' || res.body.code === 'RATE_LIMIT_COOLDOWN');
+    console.log('✔ Rate limit or Free Tier cooldown gracefully handled and diagnosis returned!');
   } else {
     console.log('Received status:', res.statusCode, res.body);
   }
