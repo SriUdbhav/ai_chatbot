@@ -1641,6 +1641,8 @@ body[data-theme="dark"] .theme-icon-moon {
   gap: 1.5rem;
   width: 100%;
   max-width: 860px;
+  min-width: 0;
+  box-sizing: border-box;
   margin: 0 auto;
 }
 
@@ -1866,9 +1868,11 @@ body[data-theme="dark"] .theme-icon-moon {
   flex-direction: column;
   width: 100%;
   max-width: 860px;
+  min-width: 0;
   margin: 0 auto;
   gap: 0.4rem;
   animation: fadeIn 0.25s ease;
+  box-sizing: border-box;
 }
 
 .msg-meta {
@@ -1919,6 +1923,8 @@ body[data-theme="dark"] .theme-icon-moon {
   font-size: 0.92rem;
   line-height: 1.65;
   word-break: break-word;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Student Message Bubble (White text, Indigo/Blue gradient with Global Surface Opacity & Adaptive Contrast) */
@@ -1954,10 +1960,13 @@ body[data-theme="dark"] .user-bubble {
   color: var(--app-text-primary);
   align-self: flex-start;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border-radius: 18px 18px 18px 4px;
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  box-sizing: border-box;
 }
 
 .error-bubble {
@@ -2069,12 +2078,26 @@ body[data-theme="dark"] .user-bubble {
 .ai-card pre {
   margin: 0.85rem 0;
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  overscroll-behavior-x: contain !important;
+  overscroll-behavior-y: contain !important;
+  max-height: min(68vh, 540px);
+  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background-color: rgba(12, 17, 29, calc(0.12 * var(--app-surface-opacity) + 0.88));
   border: 1px solid var(--border-subtle);
-  max-width: 100%;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) rgba(15, 23, 42, 0.35);
+  word-break: normal !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 .ai-bubble pre code,
@@ -2082,13 +2105,19 @@ body[data-theme="dark"] .user-bubble {
   background: transparent;
   border: none;
   color: #e2e8f0;
-  padding: 1rem;
+  padding: 1rem 1.15rem 1.6rem !important;
   display: block;
-  overflow-x: auto;
-  font-size: 0.84rem;
-  line-height: 1.55;
-  font-family: 'JetBrains Mono', monospace;
-  white-space: pre;
+  min-width: max-content;
+  overflow-x: visible;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+  white-space: pre !important;
+  tab-size: 4;
+  -moz-tab-size: 4;
+  word-break: normal !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
 }
 
 .code-header {
@@ -2117,7 +2146,9 @@ body[data-theme="dark"] .user-bubble {
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -2191,48 +2222,79 @@ body[data-theme="dark"] .user-bubble {
 
 .code-block-pre {
   margin: 0 !important;
-  padding: 1rem 1.15rem !important;
+  padding: 1rem 1.15rem 1.6rem !important;
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
-  overflow-x: auto;
-  overflow-y: auto;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
   max-height: 560px;
-  max-width: 100%;
-  box-sizing: border-box;
+  max-height: min(68vh, 560px) !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  overscroll-behavior: contain !important;
+  overscroll-behavior-x: contain !important;
+  overscroll-behavior-y: contain !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) rgba(15, 23, 42, 0.35);
+  word-break: normal !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 .code-block-content {
   background: transparent !important;
   border: none !important;
-  padding: 0 !important;
+  padding: 0 0 1.25rem 0 !important;
   color: #e2e8f0 !important;
-  display: block;
-  overflow-x: visible;
+  display: block !important;
+  min-width: max-content;
+  overflow-x: visible !important;
   font-size: 0.85rem !important;
   line-height: 1.6 !important;
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace !important;
   white-space: pre !important;
   tab-size: 4;
   -moz-tab-size: 4;
+  word-break: normal !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
 }
 
-/* Custom Scrollbars for Code Blocks */
-.code-block-pre::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Custom Scrollbars for Code Blocks (Desktop & WebKit) */
+.code-block-pre::-webkit-scrollbar,
+.ai-bubble pre::-webkit-scrollbar,
+.ai-card pre::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.code-block-pre::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.35);
+.code-block-pre::-webkit-scrollbar-thumb,
+.ai-bubble pre::-webkit-scrollbar-thumb,
+.ai-card pre::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.45);
   border-radius: 4px;
 }
 
-.code-block-pre::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(148, 163, 184, 0.65);
+.code-block-pre::-webkit-scrollbar-thumb:hover,
+.ai-bubble pre::-webkit-scrollbar-thumb:hover,
+.ai-card pre::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.75);
 }
 
-.code-block-pre::-webkit-scrollbar-track {
+.code-block-pre::-webkit-scrollbar-track,
+.ai-bubble pre::-webkit-scrollbar-track,
+.ai-card pre::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.35);
+  border-radius: 4px;
+}
+
+.code-block-pre::-webkit-scrollbar-corner,
+.ai-bubble pre::-webkit-scrollbar-corner,
+.ai-card pre::-webkit-scrollbar-corner {
   background: transparent;
 }
 
@@ -3848,6 +3910,21 @@ label {
     font-size: 0.88rem;
   }
 
+  .code-block-pre,
+  .ai-bubble pre,
+  .ai-card pre {
+    max-height: min(58vh, 380px) !important;
+    padding: 0.8rem 0.85rem 1.4rem !important;
+  }
+
+  .code-block-content,
+  .ai-bubble pre code,
+  .ai-card pre code {
+    font-size: 0.80rem !important;
+    line-height: 1.55 !important;
+    padding-bottom: 1.25rem !important;
+  }
+
   .user-bubble {
     max-width: 88%;
   }
@@ -4060,6 +4137,13 @@ label {
   .msg-bubble {
     padding: 0.75rem 0.85rem;
     font-size: 0.86rem;
+  }
+
+  .code-block-pre,
+  .ai-bubble pre,
+  .ai-card pre {
+    max-height: min(54vh, 320px) !important;
+    padding: 0.7rem 0.75rem 1.3rem !important;
   }
 
   .welcome-title {

@@ -1,0 +1,53 @@
+{
+  "topic": "circular-queues",
+  "title": "Circular Queue Using Arrays",
+  "definition": "A Circular Queue is an extended linear data structure based on the FIFO principle where the last position of the array connects back to the first position like a ring, efficiently utilizing memory vacated by dequeued elements.",
+  "why_needed": "In a linear queue, when elements are dequeued, empty slots at the beginning of the array cannot be reused once rear reaches MAX-1 (False Overflow). A circular queue overcomes this limitation by wrapping pointers around to index 0 using modulo arithmetic.",
+  "modulo_arithmetic": {
+    "next_rear": "(rear + 1) % MAX",
+    "next_front": "(front + 1) % MAX",
+    "full_condition": "(rear + 1) % MAX == front",
+    "empty_condition": "front == -1"
+  },
+  "c_program": "#include <stdio.h>\n#define MAX 5\n\nint cqueue[MAX];\nint front = -1;\nint rear = -1;\n\n// Check if circular queue is full: (rear + 1) % MAX == front\nint isFull(void) {\n    return (rear + 1) % MAX == front;\n}\n\n// Check if circular queue is empty: front == -1\nint isEmpty(void) {\n    return front == -1;\n}\n\n// Enqueue: O(1)\nvoid enqueue(int value) {\n    if (isFull()) {\n        printf(\"Circular Queue Overflow! Cannot insert %d (Queue is Full).\\n\", value);\n        return;\n    }\n    if (front == -1) {\n        // First element being added\n        front = 0;\n        rear = 0;\n    } else {\n        rear = (rear + 1) % MAX; // Circular increment\n    }\n    cqueue[rear] = value;\n    printf(\"Enqueued %d at index %d (front=%d, rear=%d).\\n\", value, rear, front, rear);\n}\n\n// Dequeue: O(1)\nint dequeue(void) {\n    if (isEmpty()) {\n        printf(\"Circular Queue Underflow! Queue is empty.\\n\");\n        return -1;\n    }\n    int item = cqueue[front];\n    printf(\"Dequeued %d from index %d \", item, front);\n    if (front == rear) {\n        // Queue had only one element, reset to empty\n        front = -1;\n        rear = -1;\n        printf(\"(Queue is now reset to empty).\\n\");\n    } else {\n        front = (front + 1) % MAX; // Circular increment\n        printf(\"(new front=%d, rear=%d).\\n\", front, rear);\n    }\n    return item;\n}\n\n// Display circular queue: O(n)\nvoid display(void) {\n    if (isEmpty()) {\n        printf(\"Circular Queue is empty.\\n\");\n        return;\n    }\n    printf(\"Circular Queue elements: \");\n    int i = front;\n    while (1) {\n        printf(\"[%d]@idx%d \", cqueue[i], i);\n        if (i == rear) break;\n        i = (i + 1) % MAX;\n    }\n    printf(\"\\n\");\n}\n\nint main(void) {\n    printf(\"--- Circular Queue Implementation in C ---\\n\");\n    enqueue(10);\n    enqueue(20);\n    enqueue(30);\n    enqueue(40);\n    enqueue(50); // Fills all 5 slots (0 to 4)\n    display();\n\n    enqueue(60); // Triggers Overflow\n\n    dequeue();   // Dequeues 10, index 0 becomes free\n    dequeue();   // Dequeues 20, index 1 becomes free\n    display();\n\n    // Now wrap-around into vacated slots 0 and 1!\n    enqueue(60); // Enqueues 60 at index 0\n    enqueue(70); // Enqueues 70 at index 1\n    display();\n\n    enqueue(80); // Full again! (rear + 1) % 5 == front (2)\n    return 0;\n}",
+  "dry_run": [
+    "Array Size MAX = 5. Initial: front = -1, rear = -1.",
+    "1. enqueue(10): front = 0, rear = 0 -> idx 0 = 10",
+    "2. enqueue(20, 30, 40, 50): rear reaches 4. front=0, rear=4.",
+    "   Check Full: (4 + 1) % 5 == 0 -> 0 == 0 -> TRUE. Queue is completely full.",
+    "3. dequeue(): removes cqueue[0] (10). front = (0 + 1) % 5 = 1. Slot 0 is now reusable!",
+    "4. dequeue(): removes cqueue[1] (20). front = (1 + 1) % 5 = 2. Slot 1 is now reusable!",
+    "5. enqueue(60): rear = (4 + 1) % 5 = 0. cqueue[0] = 60! Wraps around to beginning.",
+    "6. enqueue(70): rear = (0 + 1) % 5 = 1. cqueue[1] = 70! Wraps around to slot 1.",
+    "   Check Full: (rear + 1) % 5 = (1 + 1) % 5 = 2 == front (2). Full condition holds!"
+  ],
+  "ring_diagram": "Circular Array Diagram (MAX = 5):\n         [Index 0]\n       /           \\\n[Index 4]         [Index 1]\n      |             |\n[Index 3] ------- [Index 2]\nWrap-around happens: after Index 4, next is (4 + 1) % 5 = Index 0.",
+  "time_complexity": {
+    "enqueue": "O(1)",
+    "dequeue": "O(1)",
+    "isFull": "O(1)",
+    "isEmpty": "O(1)",
+    "display": "O(n)"
+  },
+  "space_complexity": "O(MAX) static array memory.",
+  "comparison_with_linear": {
+    "memory_utilization": "Circular Queue: 100% efficient reuse of vacated slots. Linear Queue: Slots vacated by dequeue are lost permanently.",
+    "overflow_condition": "Circular: (rear + 1) % MAX == front. Linear: rear == MAX - 1.",
+    "pointer_arithmetic": "Circular: Modulo operator '% MAX'. Linear: Simple increment '++'."
+  },
+  "viva_questions": [
+    {
+      "question": "What is the condition for a Circular Queue to be full?",
+      "answer": "When the slot immediately following rear is front: '(rear + 1) % MAX == front'."
+    },
+    {
+      "question": "What happens if you dequeue the only remaining element in a Circular Queue?",
+      "answer": "When 'front == rear', removing the element empties the queue. The queue is reset by setting both 'front = -1' and 'rear = -1'."
+    },
+    {
+      "question": "Why is the modulo operator used in circular queue pointer updates?",
+      "answer": "The modulo operator wraps index values exceeding MAX-1 back to index 0: when rear reaches index 4 in size 5, (4 + 1) % 5 = 0, creating a contiguous circular ring."
+    }
+  ]
+}
+

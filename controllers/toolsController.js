@@ -42,6 +42,7 @@ async function callGemini(ai, systemInstruction, userPrompt, isJson = false) {
   const config = {
     systemInstruction,
     temperature: isJson ? 0.2 : 0.7,
+    maxOutputTokens: 8192,
   };
 
   if (isJson) {

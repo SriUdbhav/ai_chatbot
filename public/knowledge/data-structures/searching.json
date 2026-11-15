@@ -1,0 +1,132 @@
+{
+  "topic": "searching",
+  "title": "Searching Algorithms",
+  "algorithms": [
+    {
+      "id": "linear-search",
+      "name": "Linear Search",
+      "aka": ["Sequential Search"],
+      "definition": "Linear Search is a sequential algorithm that inspects every element in a collection one by one from beginning to end until the desired target element is found or the collection is exhausted.",
+      "explanation": "Linear search is the simplest searching technique. It does not require the input array to be sorted and works equally well on arrays and linked lists. The search starts at index 0 and compares each element A[i] with the search key. If A[i] == key, the search terminates successfully, returning the index. If the loop completes without finding the key, the search concludes with failure (-1).",
+      "precondition": "None. Works on sorted and unsorted data.",
+      "algorithm": [
+        "Step 1: Start from the first element (index 0).",
+        "Step 2: Compare the current element with the target key.",
+        "Step 3: If current element == key, return the current index (Search Successful).",
+        "Step 4: If current element != key, move to the next element.",
+        "Step 5: Repeat Steps 2 to 4 until the end of the array is reached.",
+        "Step 6: If the end of the array is reached without matching the key, return -1 (Search Unsuccessful)."
+      ],
+      "pseudocode": "FUNCTION LinearSearch(A: Array, n: Integer, key: Integer) -> Integer:\n  FOR i FROM 0 TO n - 1 DO:\n    IF A[i] == key THEN:\n      RETURN i\n    END IF\n  END FOR\n  RETURN -1\nEND FUNCTION",
+      "c_program": "#include <stdio.h>\n\n// Iterative Linear Search\nint linearSearch(int arr[], int n, int key) {\n    for (int i = 0; i < n; i++) {\n        if (arr[i] == key) {\n            return i; // Element found at index i\n        }\n    }\n    return -1; // Element not found\n}\n\n// Recursive Linear Search\nint linearSearchRecursive(int arr[], int n, int key, int index) {\n    if (index >= n) return -1; // Base case: element absent\n    if (arr[index] == key) return index; // Base case: match found\n    return linearSearchRecursive(arr, n, key, index + 1); // Recursive call\n}\n\nint main(void) {\n    int arr[] = {10, 25, 45, 60, 75};\n    int n = sizeof(arr) / sizeof(arr[0]);\n    int key = 60;\n\n    printf(\"--- Linear Search in C ---\\n\");\n    printf(\"Array elements: \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\nSearching for key: %d\\n\", key);\n\n    int result = linearSearch(arr, n, key);\n    if (result != -1) {\n        printf(\"Element %d found at index %d (Position %d).\\n\", key, result, result + 1);\n    } else {\n        printf(\"Element %d not found in the array.\\n\", key);\n    }\n    return 0;\n}",
+      "sample_input_output": {
+        "input": "Array: [10, 25, 45, 60, 75], Search Key: 60",
+        "output": "Element 60 found at index 3 (Position 4)."
+      },
+      "dry_run": [
+        "Given Array: A = [10, 25, 45, 60, 75], Size n = 5, Target key = 60",
+        "Pass 0: i = 0 -> A[0] is 10. Check: 10 == 60? False. Increment i.",
+        "Pass 1: i = 1 -> A[1] is 25. Check: 25 == 60? False. Increment i.",
+        "Pass 2: i = 2 -> A[2] is 45. Check: 45 == 60? False. Increment i.",
+        "Pass 3: i = 3 -> A[3] is 60. Check: 60 == 60? TRUE! Match found!",
+        "Return index 3. Total comparisons executed: 4."
+      ],
+      "time_complexity": {
+        "best": "O(1) (Key found at the very first position A[0])",
+        "average": "O(n) (Key found midway through the array, approximately n/2 comparisons)",
+        "worst": "O(n) (Key found at the last position A[n-1] or key is absent from the array)"
+      },
+      "space_complexity": {
+        "iterative": "O(1) (Auxiliary space: uses constant memory for variables i, n, key)",
+        "recursive": "O(n) (Stack space: up to n recursive call frames on call stack)"
+      },
+      "advantages": [
+        "Extremely simple to implement and understand.",
+        "Does not require the input array to be sorted.",
+        "Works efficiently on linked lists and streams of data.",
+        "Minimal overhead for small arrays (n < 20)."
+      ],
+      "disadvantages": [
+        "Inefficient on large datasets due to linear O(n) scan.",
+        "Cannot take advantage of ordered data."
+      ],
+      "viva_questions": [
+        {
+          "question": "What is the best-case time complexity of linear search and when does it occur?",
+          "answer": "O(1). It occurs when the target element is present at the very first position (index 0) of the array."
+        },
+        {
+          "question": "Can linear search be performed on a linked list?",
+          "answer": "Yes, linear search is the natural searching technique for singly linked lists because linked lists do not support random O(1) index access."
+        },
+        {
+          "question": "What is the average number of comparisons in linear search for an array of size n?",
+          "answer": "If the element is guaranteed to be present with uniform probability, (n + 1) / 2 comparisons. Asymptotically this is O(n)."
+        }
+      ]
+    },
+    {
+      "id": "binary-search",
+      "name": "Binary Search",
+      "aka": ["Logarithmic Search", "Half-Interval Search"],
+      "definition": "Binary Search is an efficient divide-and-conquer search algorithm that locates the position of a target key in a sorted array by repeatedly halving the search interval.",
+      "explanation": "Binary search compares the target key to the middle element of the array. If they match, the search succeeds. If the key is less than the middle element, the search continues in the left half. If the key is greater, the search continues in the right half. With each comparison, half of the remaining search space is eliminated, achieving O(log n) efficiency.",
+      "precondition": "The array MUST be sorted in ascending (or descending) order before searching.",
+      "algorithm": [
+        "Step 1: Set low = 0 and high = n - 1.",
+        "Step 2: While low <= high, compute mid = low + (high - low) / 2.",
+        "Step 3: If A[mid] == key, return mid (Search Successful).",
+        "Step 4: If A[mid] < key, search right half: set low = mid + 1.",
+        "Step 5: If A[mid] > key, search left half: set high = mid - 1.",
+        "Step 6: If low > high, the interval is empty: return -1 (Key Absent)."
+      ],
+      "pseudocode": "FUNCTION BinarySearch(A: SortedArray, low: Integer, high: Integer, key: Integer) -> Integer:\n  WHILE low <= high DO:\n    mid = low + (high - low) / 2\n    IF A[mid] == key THEN:\n      RETURN mid\n    ELSE IF A[mid] < key THEN:\n      low = mid + 1\n    ELSE:\n      high = mid - 1\n    END IF\n  END WHILE\n  RETURN -1\nEND FUNCTION",
+      "c_program": "#include <stdio.h>\n\n// Iterative Binary Search\nint binarySearch(int arr[], int n, int key) {\n    int low = 0;\n    int high = n - 1;\n    while (low <= high) {\n        // Prevents integer overflow compared to (low + high) / 2\n        int mid = low + (high - low) / 2;\n        if (arr[mid] == key) {\n            return mid; // Key found\n        } else if (arr[mid] < key) {\n            low = mid + 1; // Discard left half\n        } else {\n            high = mid - 1; // Discard right half\n        }\n    }\n    return -1; // Key absent\n}\n\n// Recursive Binary Search\nint binarySearchRecursive(int arr[], int low, int high, int key) {\n    if (low > high) return -1; // Base case: absent\n    int mid = low + (high - low) / 2;\n    if (arr[mid] == key) return mid;\n    if (arr[mid] < key) return binarySearchRecursive(arr, mid + 1, high, key);\n    return binarySearchRecursive(arr, low, mid - 1, key);\n}\n\nint main(void) {\n    int arr[] = {11, 22, 33, 44, 55, 66, 77};\n    int n = sizeof(arr) / sizeof(arr[0]);\n    int key = 55;\n\n    printf(\"--- Binary Search in C ---\\n\");\n    printf(\"Sorted Array: \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\nSearching for key: %d\\n\", key);\n\n    int result = binarySearch(arr, n, key);\n    if (result != -1) {\n        printf(\"Element %d found at index %d (Position %d).\\n\", key, result, result + 1);\n    } else {\n        printf(\"Element %d not found in the array.\\n\", key);\n    }\n    return 0;\n}",
+      "sample_input_output": {
+        "input": "Sorted Array: [11, 22, 33, 44, 55, 66, 77], Search Key: 55",
+        "output": "Element 55 found at index 4 (Position 5)."
+      },
+      "dry_run": [
+        "Array: A = [11, 22, 33, 44, 55, 66, 77], Size n = 7, Target key = 55",
+        "Iteration 1: low = 0, high = 6. mid = 0 + (6-0)/2 = 3. A[3] = 44.",
+        "             Comparison: A[3] (44) == 55? False. Is 44 < 55? True -> low = mid + 1 = 4.",
+        "Iteration 2: low = 4, high = 6. mid = 4 + (6-4)/2 = 5. A[5] = 66.",
+        "             Comparison: A[5] (66) == 55? False. Is 66 < 55? False -> high = mid - 1 = 4.",
+        "Iteration 3: low = 4, high = 4. mid = 4 + (4-4)/2 = 4. A[4] = 55.",
+        "             Comparison: A[4] (55) == 55? TRUE! Match found!",
+        "Return index 4. Total comparisons executed: 3."
+      ],
+      "time_complexity": {
+        "best": "O(1) (Target key is situated at the exact middle element of the array on first try)",
+        "average": "O(log n) (Each step cuts the remaining search space strictly in half)",
+        "worst": "O(log n) (Key is found at leaf level of decision tree or key is not in array)"
+      },
+      "space_complexity": {
+        "iterative": "O(1) (No auxiliary memory beyond low, high, mid)",
+        "recursive": "O(log n) (Call stack frames proportional to recursion tree height)"
+      },
+      "overflow_explanation": "In C, computing 'mid = (low + high) / 2' can cause undefined behavior if 'low + high' exceeds the 32-bit signed integer limit (2,147,483,647). Using 'mid = low + (high - low) / 2' is mathematically identical but subtracts first, completely preventing integer overflow.",
+      "comparison_with_linear": {
+        "dataset_requirement": "Linear Search: Unsorted or sorted. Binary Search: MUST be sorted.",
+        "data_structures": "Linear Search: Arrays and Linked Lists. Binary Search: Arrays (requires O(1) random indexing).",
+        "time_complexity": "Linear Search: O(n). Binary Search: O(log n).",
+        "comparison_count_at_1_million": "Linear Search: Up to 1,000,000 comparisons. Binary Search: At most 20 comparisons!"
+      },
+      "viva_questions": [
+        {
+          "question": "Why can binary search not be efficiently implemented on a standard singly linked list?",
+          "answer": "Binary search requires O(1) direct access to the middle element via index calculation. In a singly linked list, accessing the middle element requires O(n) traversal from the head, which eliminates the O(log n) logarithmic advantage."
+        },
+        {
+          "question": "What is the recurrence relation for binary search?",
+          "answer": "T(n) = T(n/2) + O(1). Solving this using the Master Theorem gives T(n) = O(log n)."
+        },
+        {
+          "question": "What happens when the search key does not exist in the array?",
+          "answer": "The search continues halving intervals until low exceeds high (low > high). The loop terminates and the function returns -1."
+        }
+      ]
+    }
+  ]
+}
+

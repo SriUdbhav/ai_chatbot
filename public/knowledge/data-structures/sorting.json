@@ -1,0 +1,175 @@
+{
+  "topic": "sorting",
+  "title": "Sorting Algorithms",
+  "algorithms": [
+    {
+      "id": "selection-sort",
+      "name": "Selection Sort",
+      "definition": "Selection Sort is an in-place comparison sort that divides the array into a sorted subarray and an unsorted subarray, repeatedly finding the minimum element from the unsorted subarray and moving it to the beginning.",
+      "working_principle": "In pass i (from 0 to n-2), find the index of the smallest element in arr[i...n-1]. Swap this minimum element with arr[i]. After pass i, the first i+1 elements are guaranteed to be sorted.",
+      "c_program": "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n    int temp = *a;\n    *a = *b;\n    *b = temp;\n}\n\nvoid selectionSort(int arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        int min_idx = i;\n        for (int j = i + 1; j < n; j++) {\n            if (arr[j] < arr[min_idx]) {\n                min_idx = j;\n            }\n        }\n        if (min_idx != i) {\n            swap(&arr[i], &arr[min_idx]);\n        }\n    }\n}\n\nint main(void) {\n    int arr[] = {64, 25, 12, 22, 11};\n    int n = sizeof(arr) / sizeof(arr[0]);\n\n    printf(\"--- Selection Sort in C ---\\n\");\n    printf(\"Original: \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n\n    selectionSort(arr, n);\n\n    printf(\"Sorted:   \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n    return 0;\n}",
+      "dry_run": [
+        "Initial: [64, 25, 12, 22, 11]",
+        "Pass 0 (i=0): Scan arr[0..4]. Min is 11 at index 4. Swap arr[0] (64) with arr[4] (11) -> [11, 25, 12, 22, 64]",
+        "Pass 1 (i=1): Scan arr[1..4]. Min is 12 at index 2. Swap arr[1] (25) with arr[2] (12) -> [11, 12, 25, 22, 64]",
+        "Pass 2 (i=2): Scan arr[2..4]. Min is 22 at index 3. Swap arr[2] (25) with arr[3] (22) -> [11, 12, 22, 25, 64]",
+        "Pass 3 (i=3): Scan arr[3..4]. Min is 25 at index 3. No swap needed -> [11, 12, 22, 25, 64]",
+        "Array fully sorted in n-1 = 4 passes."
+      ],
+      "time_complexity": {
+        "best": "O(n^2) (Still executes (n-1)*n/2 comparisons even if array is already sorted)",
+        "average": "O(n^2)",
+        "worst": "O(n^2)"
+      },
+      "space_complexity": "O(1) Auxiliary space (In-place sort)",
+      "stability": "Unstable (e.g. [4a, 5, 4b, 2] -> 4a gets swapped to the end behind 4b)",
+      "in_place": "Yes (O(1) memory)",
+      "viva_questions": [
+        {
+          "question": "What is the primary advantage of selection sort?",
+          "answer": "It makes at most O(n) swaps (at most n-1 swaps), making it valuable when writing to memory is expensive (such as Flash memory/EEPROM)."
+        },
+        {
+          "question": "Why is selection sort O(n^2) even in the best case?",
+          "answer": "Because the inner loop must always scan to the very end of the unsorted portion to guarantee that no smaller element exists."
+        }
+      ]
+    },
+    {
+      "id": "bubble-sort",
+      "name": "Bubble Sort",
+      "definition": "Bubble Sort is a comparison-based algorithm where each pair of adjacent elements is compared and swapped if they are in the wrong order. This process repeats until no swaps are needed.",
+      "working_principle": "In pass 0, the largest element 'bubbles up' to the last position arr[n-1]. In pass 1, the second largest bubbles up to arr[n-2]. An optimized version uses a 'swapped' flag to terminate early in O(n) time if the array is already sorted.",
+      "c_program": "#include <stdio.h>\n#include <stdbool.h>\n\nvoid swap(int *a, int *b) {\n    int temp = *a;\n    *a = *b;\n    *b = temp;\n}\n\nvoid bubbleSort(int arr[], int n) {\n    for (int i = 0; i < n - 1; i++) {\n        bool swapped = false;\n        for (int j = 0; j < n - i - 1; j++) {\n            if (arr[j] > arr[j + 1]) {\n                swap(&arr[j], &arr[j + 1]);\n                swapped = true;\n            }\n        }\n        // If no two elements were swapped in inner loop, array is sorted\n        if (!swapped) break;\n    }\n}\n\nint main(void) {\n    int arr[] = {5, 1, 4, 2, 8};\n    int n = sizeof(arr) / sizeof(arr[0]);\n\n    printf(\"--- Optimized Bubble Sort in C ---\\n\");\n    printf(\"Original: \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n\n    bubbleSort(arr, n);\n\n    printf(\"Sorted:   \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n    return 0;\n}",
+      "dry_run": [
+        "Initial: [5, 1, 4, 2, 8]",
+        "Pass 0: (5>1 swap -> [1,5,4,2,8]) -> (5>4 swap -> [1,4,5,2,8]) -> (5>2 swap -> [1,4,2,5,8]) -> (5>8 no) -> [1, 4, 2, 5, 8]",
+        "Pass 1: (1>4 no) -> (4>2 swap -> [1,2,4,5,8]) -> (4>5 no) -> [1, 2, 4, 5, 8]",
+        "Pass 2: (1>2 no) -> (2>4 no) -> No swaps occurred! Early termination triggered.",
+        "Sorted: [1, 2, 4, 5, 8] in 3 passes."
+      ],
+      "time_complexity": {
+        "best": "O(n) (When array is already sorted, detected by swapped flag in 1 pass)",
+        "average": "O(n^2)",
+        "worst": "O(n^2) (When array is in reverse sorted order)"
+      },
+      "space_complexity": "O(1) Auxiliary space",
+      "stability": "Stable (Equal elements are never swapped across each other)",
+      "in_place": "Yes",
+      "viva_questions": [
+        {
+          "question": "How can bubble sort be optimized for an already-sorted array?",
+          "answer": "By using a boolean flag 'swapped'. If an entire inner pass completes without a single swap, the array is sorted and the algorithm breaks immediately, running in O(n) time."
+        },
+        {
+          "question": "Is bubble sort stable?",
+          "answer": "Yes, because adjacent elements are only swapped when arr[j] > arr[j+1], preserving the relative order of duplicate values."
+        }
+      ]
+    },
+    {
+      "id": "merge-sort",
+      "name": "Merge Sort",
+      "definition": "Merge Sort is a divide-and-conquer algorithm that recursively halves the array until individual elements are reached, and then merges the sorted halves into a completely sorted array.",
+      "working_principle": "1. Divide: Split the array into two halves at mid = l + (r - l) / 2. 2. Conquer: Recursively call mergeSort on left half and right half. 3. Combine: Call merge() to combine the two sorted halves using an auxiliary buffer.",
+      "c_program": "#include <stdio.h>\n#include <stdlib.h>\n\nvoid merge(int arr[], int l, int m, int r) {\n    int n1 = m - l + 1;\n    int n2 = r - m;\n    int L[n1], R[n2];\n\n    for (int i = 0; i < n1; i++) L[i] = arr[l + i];\n    for (int j = 0; j < n2; j++) R[j] = arr[m + 1 + j];\n\n    int i = 0, j = 0, k = l;\n    while (i < n1 && j < n2) {\n        if (L[i] <= R[j]) {\n            arr[k++] = L[i++];\n        } else {\n            arr[k++] = R[j++];\n        }\n    }\n    while (i < n1) arr[k++] = L[i++];\n    while (j < n2) arr[k++] = R[j++];\n}\n\nvoid mergeSort(int arr[], int l, int r) {\n    if (l < r) {\n        int m = l + (r - l) / 2;\n        mergeSort(arr, l, m);\n        mergeSort(arr, m + 1, r);\n        merge(arr, l, m, r);\n    }\n}\n\nint main(void) {\n    int arr[] = {38, 27, 43, 3, 9, 82, 10};\n    int n = sizeof(arr) / sizeof(arr[0]);\n\n    printf(\"--- Merge Sort in C ---\\n\");\n    printf(\"Original: \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n\n    mergeSort(arr, 0, n - 1);\n\n    printf(\"Sorted:   \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n    return 0;\n}",
+      "dry_run": [
+        "Array: [38, 27, 43, 3, 9, 82, 10]",
+        "Split: [38, 27, 43, 3] and [9, 82, 10]",
+        "Sub-split: [38, 27] and [43, 3] -> Merge to [27, 38] and [3, 43]",
+        "Merge left: Merge([27, 38], [3, 43]) -> [3, 27, 38, 43]",
+        "Merge right: [9] and [82, 10] -> [9] and [10, 82] -> Merge([9], [10, 82]) -> [9, 10, 82]",
+        "Final Merge: Merge([3, 27, 38, 43], [9, 10, 82]) -> [3, 9, 10, 27, 38, 43, 82]"
+      ],
+      "time_complexity": {
+        "best": "O(n log n)",
+        "average": "O(n log n)",
+        "worst": "O(n log n) (Guaranteed across all input arrangements)"
+      },
+      "space_complexity": "O(n) auxiliary memory for buffer arrays during merge step",
+      "stability": "Stable (L[i] <= R[j] keeps duplicate elements in original order)",
+      "in_place": "No (Out-of-place due to O(n) temp array)",
+      "viva_questions": [
+        {
+          "question": "What is the recurrence relation for merge sort?",
+          "answer": "T(n) = 2T(n/2) + O(n). Solving with Master Theorem Case 2 yields T(n) = O(n log n)."
+        },
+        {
+          "question": "Why is merge sort preferred for sorting linked lists?",
+          "answer": "Because linked lists can be merged in O(1) extra space simply by updating pointers, overcoming the O(n) memory penalty on arrays."
+        }
+      ]
+    },
+    {
+      "id": "quick-sort",
+      "name": "Quick Sort",
+      "definition": "Quick Sort is a divide-and-conquer in-place sorting algorithm that partitions an array around a chosen pivot element such that all smaller elements are placed before the pivot and all larger elements after it.",
+      "working_principle": "1. Pick a pivot (commonly last element). 2. Partition: rearrange array so elements <= pivot are to left, and > pivot to right. Place pivot at its final correct index. 3. Recursively call quickSort on left and right partitions.",
+      "c_program": "#include <stdio.h>\n\nvoid swap(int *a, int *b) {\n    int temp = *a;\n    *a = *b;\n    *b = temp;\n}\n\n// Lomuto Partition Scheme\nint partition(int arr[], int low, int high) {\n    int pivot = arr[high]; // Choose last element as pivot\n    int i = low - 1;       // Index of smaller element\n\n    for (int j = low; j < high; j++) {\n        if (arr[j] <= pivot) {\n            i++;\n            swap(&arr[i], &arr[j]);\n        }\n    }\n    swap(&arr[i + 1], &arr[high]); // Place pivot in correct position\n    return (i + 1);\n}\n\nvoid quickSort(int arr[], int low, int high) {\n    if (low < high) {\n        int pi = partition(arr, low, high);\n        quickSort(arr, low, pi - 1);  // Before pi\n        quickSort(arr, pi + 1, high); // After pi\n    }\n}\n\nint main(void) {\n    int arr[] = {10, 80, 30, 90, 40, 50, 70};\n    int n = sizeof(arr) / sizeof(arr[0]);\n\n    printf(\"--- Quick Sort in C (Lomuto Partition) ---\\n\");\n    printf(\"Original: \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n\n    quickSort(arr, 0, n - 1);\n\n    printf(\"Sorted:   \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n    return 0;\n}",
+      "dry_run": [
+        "Array: [10, 80, 30, 90, 40, 50, 70], low=0, high=6, pivot = 70",
+        "i = -1.",
+        "j=0: arr[0]=10 <= 70 -> i=0, swap(arr[0],arr[0]) -> [10, 80, 30, 90, 40, 50, 70]",
+        "j=1: arr[1]=80 > 70  -> no change",
+        "j=2: arr[2]=30 <= 70 -> i=1, swap(arr[1],arr[2]) -> [10, 30, 80, 90, 40, 50, 70]",
+        "j=3: arr[3]=90 > 70  -> no change",
+        "j=4: arr[4]=40 <= 70 -> i=2, swap(arr[2],arr[4]) -> [10, 30, 40, 90, 80, 50, 70]",
+        "j=5: arr[5]=50 <= 70 -> i=3, swap(arr[3],arr[5]) -> [10, 30, 40, 50, 80, 90, 70]",
+        "Place pivot: swap(arr[i+1], arr[high]) -> swap arr[4] (80) with arr[6] (70) -> [10, 30, 40, 50, 70, 90, 80]",
+        "Pivot 70 is placed at index 4. Recurse on left [10,30,40,50] and right [90,80]."
+      ],
+      "time_complexity": {
+        "best": "O(n log n) (Pivot always divides array into two balanced halves)",
+        "average": "O(n log n)",
+        "worst": "O(n^2) (When pivot is consistently smallest or largest, e.g., already sorted array with end pivot)"
+      },
+      "space_complexity": "O(log n) auxiliary stack space for recursion (O(n) in worst case)",
+      "stability": "Unstable (Swapping elements around pivot disrupts order of duplicates)",
+      "in_place": "Yes (O(1) heap auxiliary memory)",
+      "viva_questions": [
+        {
+          "question": "How can the worst-case O(n^2) of Quick Sort be avoided?",
+          "answer": "By using Randomized Pivot selection (picking pivot at a random index) or Median-of-Three pivot selection (median of first, middle, last elements)."
+        },
+        {
+          "question": "Why is Quick Sort usually faster in practice than Merge Sort?",
+          "answer": "Quick Sort is in-place and exhibits excellent cache locality (spatial locality), with lower constant factors in its inner loop compared to Merge Sort's array copying."
+        }
+      ]
+    },
+    {
+      "id": "insertion-sort",
+      "name": "Insertion Sort",
+      "definition": "Insertion Sort is a simple in-place comparison sort that builds the final sorted array one item at a time by repeatedly taking the next element and inserting it into its correct position within the already sorted portion.",
+      "working_principle": "Analogous to sorting playing cards in hand: Start with the second element (index 1). Store it in `key`. Compare `key` with preceding elements. Shift all elements greater than `key` one position to the right. Insert `key` into the empty spot. Repeat for all elements.",
+      "c_program": "#include <stdio.h>\n\nvoid insertionSort(int arr[], int n) {\n    for (int i = 1; i < n; i++) {\n        int key = arr[i];\n        int j = i - 1;\n\n        // Move elements of arr[0..i-1] that are greater than key to one position ahead\n        while (j >= 0 && arr[j] > key) {\n            arr[j + 1] = arr[j];\n            j = j - 1;\n        }\n        arr[j + 1] = key;\n    }\n}\n\nint main(void) {\n    int arr[] = {12, 11, 13, 5, 6};\n    int n = sizeof(arr) / sizeof(arr[0]);\n\n    printf(\"--- Insertion Sort in C ---\\n\");\n    printf(\"Original: \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n\n    insertionSort(arr, n);\n\n    printf(\"Sorted:   \");\n    for (int i = 0; i < n; i++) printf(\"%d \", arr[i]);\n    printf(\"\\n\");\n    return 0;\n}",
+      "dry_run": [
+        "Initial: [12, 11, 13, 5, 6]",
+        "Pass 1 (i=1, key=11): Compare 11 with 12. 12 > 11 -> shift 12 right -> insert 11 at [0] -> [11, 12, 13, 5, 6]",
+        "Pass 2 (i=2, key=13): Compare 13 with 12. 12 < 13 -> no shift -> 13 stays at [2] -> [11, 12, 13, 5, 6]",
+        "Pass 3 (i=3, key=5):  Compare 5 with 13, 12, 11 -> shift all right -> insert 5 at [0] -> [5, 11, 12, 13, 6]",
+        "Pass 4 (i=4, key=6):  Compare 6 with 13, 12, 11 -> shift 13, 12, 11 right -> insert 6 at [1] -> [5, 6, 11, 12, 13]",
+        "Array fully sorted in n-1 = 4 passes."
+      ],
+      "time_complexity": {
+        "best": "O(n) (When array is already sorted; inner while loop condition fails on first check)",
+        "average": "O(n^2)",
+        "worst": "O(n^2) (When array is in reverse sorted order; maximum shifts required)"
+      },
+      "space_complexity": "O(1) Auxiliary space (In-place)",
+      "stability": "Stable (Only shifts when arr[j] > key, never when equal)",
+      "in_place": "Yes",
+      "viva_questions": [
+        {
+          "question": "Why is Insertion Sort preferred for nearly sorted or small datasets?",
+          "answer": "It is adaptive: running in O(n) linear time when data is already nearly sorted, with minimal constant factors and zero auxiliary memory allocation."
+        },
+        {
+          "question": "Is Insertion Sort an online algorithm?",
+          "answer": "Yes, it can sort a list as it receives it in real-time, because it processes elements one by one without needing to know the complete dataset upfront."
+        }
+      ]
+    }
+  ]
+}
+

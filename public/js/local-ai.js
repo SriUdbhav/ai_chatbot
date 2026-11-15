@@ -444,7 +444,7 @@ export async function generateLocalResponse({
       messages,
       temperature: 0.6,
       stream: true,
-      max_tokens: 1536
+      max_tokens: 4096
     });
 
     for await (const chunk of stream) {
@@ -658,4 +658,409 @@ export async function runPreExamReadinessTest(onStepProgress) {
 
   return results;
 }
+
+// ── 12. Permanent Model Installation Store (IndexedDB + LocalStorage) ──────────
+const DB_NAME = 'studymate_offline_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'model_installations';
+const EXAM_MODE_KEY = 'studymate_exam_mode';
+
+function openInstallationDb() {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === 'undefined') {
+      resolve(null);
+      return;
+    }
+    try {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'modelId' });
+        }
+      };
+      request.onsuccess = (event) => resolve(event.target.result);
+      request.onerror = () => resolve(null);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * Retrieves the installation record for a model from IndexedDB (or fallback LocalStorage).
+ * @param {string} [modelId]
+ * @returns {Promise<object|null>}
+ */
+export async function getInstallationRecord(modelId) {
+  const target = modelId || getSelectedModelId();
+  // 1. Try IndexedDB
+  try {
+    const db = await openInstallationDb();
+    if (db) {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const record = await new Promise((resolve) => {
+        const req = store.get(target);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      });
+      if (record) return record;
+    }
+  } catch (e) {}
+
+  // 2. Fallback to localStorage
+  try {
+    const raw = localStorage.getItem(`studymate_model_installed_${target}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+
+  return null;
+}
+
+/**
+ * Persists an installation record to both IndexedDB and LocalStorage.
+ * @param {object} record
+ */
+export async function saveInstallationRecord(record) {
+  if (!record || !record.modelId) return;
+  // 1. Save to IndexedDB
+  try {
+    const db = await openInstallationDb();
+    if (db) {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put(record);
+      await new Promise((resolve) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      });
+    }
+  } catch (e) {}
+
+  // 2. Save to localStorage
+  try {
+    localStorage.setItem(`studymate_model_installed_${record.modelId}`, JSON.stringify(record));
+  } catch (e) {}
+}
+
+/**
+ * Deletes an installation record from IndexedDB and LocalStorage.
+ * @param {string} [modelId]
+ */
+export async function deleteInstallationRecord(modelId) {
+  const target = modelId || getSelectedModelId();
+  try {
+    const db = await openInstallationDb();
+    if (db) {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.delete(target);
+    }
+  } catch (e) {}
+
+  try {
+    localStorage.removeItem(`studymate_model_installed_${target}`);
+    localStorage.removeItem(EXAM_VERIFIED_KEY);
+  } catch (e) {}
+}
+
+/**
+ * Deeply verifies whether the model is actually installed and operational on disk.
+ * Never trusts a metadata flag without confirming actual WebLLM CacheStorage / OPFS presence.
+ *
+ * @param {string} [modelId]
+ * @returns {Promise<{installed: boolean, status: string, modelId: string, modelInfo: object, record?: object, reason?: string}>}
+ */
+export async function verifyModelInstallation(modelId) {
+  const target = modelId || getSelectedModelId();
+  const modelInfo = SUPPORTED_MODELS.find(m => m.id === target) || SUPPORTED_MODELS[0];
+
+  // Genuine check of WebLLM tensor cache in CacheStorage / OPFS
+  const isCached = await isModelCached(target);
+  let record = await getInstallationRecord(target);
+
+  if (isCached) {
+    const persisted = await isStoragePersisted();
+    if (!record || record.status !== 'installed') {
+      // Auto-repair or register record if files exist
+      record = {
+        modelId: target,
+        name: modelInfo.name,
+        sizeEstimate: modelInfo.sizeEstimate,
+        installedAt: record?.installedAt || Date.now(),
+        lastVerifiedAt: Date.now(),
+        lastSuccessfulInit: record?.lastSuccessfulInit || Date.now(),
+        lastTestGenerationAt: record?.lastTestGenerationAt || null,
+        persisted: Boolean(persisted),
+        status: 'installed',
+        engineVersion: webllm.modelVersion || '0.2.78'
+      };
+      await saveInstallationRecord(record);
+    } else {
+      record.lastVerifiedAt = Date.now();
+      record.persisted = Boolean(persisted);
+      await saveInstallationRecord(record);
+    }
+
+    return {
+      installed: true,
+      status: 'ready',
+      modelId: target,
+      modelInfo,
+      record
+    };
+  }
+
+  // If NOT cached on disk:
+  if (record && record.status === 'installed') {
+    // Record claims installed, but files were deleted or evicted from CacheStorage!
+    record.status = 'corrupted';
+    record.lastVerifiedAt = Date.now();
+    await saveInstallationRecord(record);
+    return {
+      installed: false,
+      status: 'corrupted',
+      reason: 'Model tensor files missing from browser storage. One-click recovery required.',
+      modelId: target,
+      modelInfo,
+      record
+    };
+  }
+
+  return {
+    installed: false,
+    status: 'not_installed',
+    modelId: target,
+    modelInfo,
+    record: null
+  };
+}
+
+/**
+ * One-time permanent model installation.
+ * If already installed and verified on disk, avoids redundant downloads.
+ * Downloads all shards, compiles WebGPU shaders, executes a test generation, and persists durable record.
+ *
+ * @param {string} [modelId]
+ * @param {function} [onProgress]
+ * @returns {Promise<{success: boolean, alreadyInstalled: boolean, modelId: string, record: object}>}
+ */
+export async function installModel(modelId, onProgress) {
+  const target = modelId || getSelectedModelId();
+  const modelInfo = SUPPORTED_MODELS.find(m => m.id === target) || SUPPORTED_MODELS[0];
+
+  // 1. Check if model is ALREADY installed & verified on disk
+  const verification = await verifyModelInstallation(target);
+  if (verification.installed && verification.status === 'ready') {
+    console.log(`[LocalAI] Model ${target} is already installed and verified on disk. Skipping download.`);
+    if (!activeEngine || activeModelId !== target) {
+      await initEngine(target, onProgress);
+    }
+    return {
+      success: true,
+      alreadyInstalled: true,
+      modelId: target,
+      record: verification.record
+    };
+  }
+
+  // 2. Hardware diagnostic check
+  const gpuCheck = await checkWebGPUSupport();
+  if (!gpuCheck.supported) {
+    const err = new Error(gpuCheck.reason);
+    err.code = 'WEBGPU_UNAVAILABLE';
+    throw err;
+  }
+
+  // 3. Storage quota check
+  const quotaCheck = await checkStorageQuotaForModel(target);
+  if (!quotaCheck.sufficient) {
+    const err = new Error(quotaCheck.message);
+    err.code = 'QUOTA_EXCEEDED';
+    throw err;
+  }
+
+  // 4. Request persistent browser storage
+  await requestPersistentStorage();
+
+  // 5. Download weights & initialize engine via WebWorkerMLCEngine
+  await initEngine(target, onProgress);
+
+  // 6. Perform a live verification test generation to verify WebGPU pipeline
+  let testSuccess = false;
+  try {
+    const testRes = await activeEngine.chat.completions.create({
+      messages: [{ role: 'user', content: 'Say Ready' }],
+      max_tokens: 8,
+      temperature: 0.1
+    });
+    const replyText = testRes.choices[0]?.message?.content || '';
+    if (replyText.length > 0) {
+      testSuccess = true;
+    }
+  } catch (genErr) {
+    console.warn('[LocalAI] Post-install test generation warning:', genErr);
+  }
+
+  // 7. Verify model weights exist in CacheStorage
+  const isCached = await isModelCached(target);
+  if (!isCached) {
+    throw new Error('Model installation completed, but model weights were not detected in persistent browser cache.');
+  }
+
+  // 8. Create and persist permanent installation record
+  const persisted = await isStoragePersisted();
+  const record = {
+    modelId: target,
+    name: modelInfo.name,
+    sizeEstimate: modelInfo.sizeEstimate,
+    installedAt: Date.now(),
+    lastVerifiedAt: Date.now(),
+    lastSuccessfulInit: Date.now(),
+    lastTestGenerationAt: testSuccess ? Date.now() : null,
+    persisted: Boolean(persisted),
+    status: 'installed',
+    engineVersion: webllm.modelVersion || '0.2.78'
+  };
+
+  await saveInstallationRecord(record);
+  console.log(`[LocalAI] Model ${target} successfully installed and recorded.`);
+
+  return {
+    success: true,
+    alreadyInstalled: false,
+    modelId: target,
+    record
+  };
+}
+
+/**
+ * Recovers a corrupted or partially deleted model.
+ * Cleans any stale cache, resets metadata, and runs clean installation.
+ *
+ * @param {string} [modelId]
+ * @param {function} [onProgress]
+ * @returns {Promise<object>}
+ */
+export async function recoverModel(modelId, onProgress) {
+  const target = modelId || getSelectedModelId();
+  console.log(`[LocalAI] Initiating model recovery for: ${target}`);
+  try {
+    await deleteLocalModel(target);
+  } catch (e) {
+    console.warn('[LocalAI] Cache cleanup during recovery warning:', e);
+  }
+  await deleteInstallationRecord(target);
+  return await installModel(target, onProgress);
+}
+
+/**
+ * Ensures the engine is initialized and ready in GPU VRAM if installed.
+ * Avoids any download or network activity.
+ *
+ * @param {string} [modelId]
+ * @returns {Promise<object|null>}
+ */
+export async function ensureEngineReady(modelId) {
+  const target = modelId || getSelectedModelId();
+  if (activeEngine && activeModelId === target) {
+    return activeEngine;
+  }
+  const verification = await verifyModelInstallation(target);
+  if (verification.installed && verification.status === 'ready') {
+    return await initEngine(target);
+  }
+  return null;
+}
+
+// ── 13. Dedicated Examination Mode State & Startup Status ─────────────────────
+export function getExamModeActive() {
+  try {
+    return localStorage.getItem(EXAM_MODE_KEY) === 'true' || sessionStorage.getItem(EXAM_MODE_KEY) === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+export function setExamModeActive(active) {
+  try {
+    if (active) {
+      localStorage.setItem(EXAM_MODE_KEY, 'true');
+      sessionStorage.setItem(EXAM_MODE_KEY, 'true');
+    } else {
+      localStorage.removeItem(EXAM_MODE_KEY);
+      sessionStorage.removeItem(EXAM_MODE_KEY);
+    }
+  } catch (e) {}
+}
+
+/**
+ * Computes the unified application startup status without blocking UI.
+ * Used to set status indicators and auto-route online/offline modes.
+ *
+ * @returns {Promise<object>}
+ */
+export async function getStartupStatus() {
+  const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+  const examModeActive = getExamModeActive();
+  const modelId = getSelectedModelId();
+  const modelInfo = SUPPORTED_MODELS.find(m => m.id === modelId) || SUPPORTED_MODELS[0];
+  const verification = await verifyModelInstallation(modelId);
+
+  let status = 'initial_installation_required';
+  let badgeLabel = 'Initial Installation Required';
+  let dotClass = 'dot-amber';
+
+  if (examModeActive) {
+    if (verification.installed) {
+      status = 'exam_ready';
+      badgeLabel = 'Exam Offline Ready';
+      dotClass = 'dot-emerald';
+    } else {
+      status = 'initial_installation_required';
+      badgeLabel = 'Exam Mode (Setup Required)';
+      dotClass = 'dot-red';
+    }
+  } else if (verification.status === 'corrupted') {
+    status = 'model_recovery_required';
+    badgeLabel = 'Model Recovery Required';
+    dotClass = 'dot-red';
+  } else if (isOnline) {
+    if (verification.installed) {
+      status = 'online_gemini_ready';
+      badgeLabel = 'Online Gemini Ready';
+      dotClass = 'dot-green';
+    } else {
+      status = 'online_gemini_ready';
+      badgeLabel = 'Online Gemini Ready';
+      dotClass = 'dot-green';
+    }
+  } else {
+    // Offline:
+    if (verification.installed) {
+      status = 'offline_webllm_ready';
+      badgeLabel = 'Offline WebLLM Ready';
+      dotClass = 'dot-purple';
+    } else {
+      status = 'initial_installation_required';
+      badgeLabel = 'Initial Installation Required';
+      dotClass = 'dot-amber';
+    }
+  }
+
+  return {
+    isOnline,
+    examModeActive,
+    modelId,
+    modelInfo,
+    isInstalled: verification.installed,
+    verificationStatus: verification.status,
+    record: verification.record,
+    status,
+    badgeLabel,
+    dotClass
+  };
+}
+
 

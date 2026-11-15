@@ -279,6 +279,7 @@ async function callGemini(ai, modelName, history, userMessage, mode = 'standard'
     model:  modelName,
     config: {
       systemInstruction: finalSystemInstruction,
+      maxOutputTokens: 8192,
     },
     history: sdkHistory,
   });

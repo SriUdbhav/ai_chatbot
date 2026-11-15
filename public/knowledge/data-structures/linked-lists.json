@@ -1,0 +1,56 @@
+{
+  "topic": "linked-lists",
+  "title": "Linked Lists (Singly, Doubly, and Circular)",
+  "syllabus_unit": "DS-UNIT-3",
+  "c_program": "#include <stdio.h>\n#include <stdlib.h>\n\nstruct Node {\n    int data;\n    struct Node *next;\n};\n\nstruct Node* createNode(int val) {\n    struct Node *n = (struct Node *)malloc(sizeof(struct Node));\n    n->data = val;\n    n->next = NULL;\n    return n;\n}\n\nstruct Node* insertAtBeginning(struct Node *head, int val) {\n    struct Node *n = createNode(val);\n    n->next = head;\n    return n;\n}\n\nstruct Node* insertAtEnd(struct Node *head, int val) {\n    struct Node *n = createNode(val);\n    if (!head) return n;\n    struct Node *t = head;\n    while (t->next) t = t->next;\n    t->next = n;\n    return head;\n}\n\nstruct Node* deleteFromBeginning(struct Node *head) {\n    if (!head) return NULL;\n    struct Node *temp = head;\n    head = head->next;\n    free(temp);\n    return head;\n}\n\nvoid freeList(struct Node *head) {\n    struct Node *temp;\n    while (head != NULL) {\n        temp = head;\n        head = head->next;\n        free(temp);\n    }\n}\n\nstruct Node* reverseList(struct Node *head) {\n    struct Node *prev = NULL, *curr = head, *next = NULL;\n    while (curr) {\n        next = curr->next;\n        curr->next = prev;\n        prev = curr;\n        curr = next;\n    }\n    return prev;\n}\n\nvoid display(struct Node *head) {\n    while (head) {\n        printf(\"[%d] -> \", head->data);\n        head = head->next;\n    }\n    printf(\"NULL\\n\");\n}\n\nint main(void) {\n    struct Node *head = NULL;\n    head = insertAtEnd(head, 10);\n    head = insertAtEnd(head, 20);\n    head = insertAtEnd(head, 30);\n    head = insertAtBeginning(head, 5);\n    printf(\"Initial list: \");\n    display(head);\n\n    head = deleteFromBeginning(head);\n    printf(\"After deleting head: \");\n    display(head);\n\n    head = reverseList(head);\n    printf(\"Reversed list: \");\n    display(head);\n\n    freeList(head);\n    return 0;\n}",
+  "items": {
+    "singly_linked_list": {
+      "name": "Singly Linked List",
+      "definition": "A Singly Linked List is a linear dynamic data structure composed of nodes where each node contains data and a single pointer (`next`) pointing to the succeeding node in sequence, ending with NULL.",
+      "node_structure": "struct Node {\n    int data;\n    struct Node *next;\n};",
+      "operations": [
+        "Creation: Allocate memory via malloc().",
+        "Insertion at Beginning: O(1) time.",
+        "Insertion at End: O(n) without tail pointer, O(1) with tail.",
+        "Insertion at Position: O(n) traversal to (pos - 1).",
+        "Deletion from Beginning: O(1) time.",
+        "Deletion from End: O(n) traversal to second-last node.",
+        "Deletion from Position: O(n) time.",
+        "Reversing List: O(n) time using 3 pointers (prev, curr, next).",
+        "Search: O(n) sequential scan."
+      ],
+      "c_program": "#include <stdio.h>\n#include <stdlib.h>\n\nstruct Node {\n    int data;\n    struct Node *next;\n};\n\nstruct Node* createNode(int val) {\n    struct Node *n = (struct Node *)malloc(sizeof(struct Node));\n    n->data = val;\n    n->next = NULL;\n    return n;\n}\n\nstruct Node* insertAtBeginning(struct Node *head, int val) {\n    struct Node *n = createNode(val);\n    n->next = head;\n    return n;\n}\n\nstruct Node* insertAtEnd(struct Node *head, int val) {\n    struct Node *n = createNode(val);\n    if (!head) return n;\n    struct Node *t = head;\n    while (t->next) t = t->next;\n    t->next = n;\n    return head;\n}\n\nstruct Node* deleteFromBeginning(struct Node *head) {\n    if (!head) return NULL;\n    struct Node *temp = head;\n    head = head->next;\n    free(temp);\n    return head;\n}\n\nvoid freeList(struct Node *head) {\n    struct Node *temp;\n    while (head != NULL) {\n        temp = head;\n        head = head->next;\n        free(temp);\n    }\n}\n\nstruct Node* reverseList(struct Node *head) {\n    struct Node *prev = NULL, *curr = head, *next = NULL;\n    while (curr) {\n        next = curr->next;\n        curr->next = prev;\n        prev = curr;\n        curr = next;\n    }\n    return prev;\n}\n\nvoid display(struct Node *head) {\n    while (head) {\n        printf(\"[%d] -> \", head->data);\n        head = head->next;\n    }\n    printf(\"NULL\\n\");\n}\n\nint main(void) {\n    struct Node *head = NULL;\n    head = insertAtEnd(head, 10);\n    head = insertAtEnd(head, 20);\n    head = insertAtEnd(head, 30);\n    head = insertAtBeginning(head, 5);\n    printf(\"Initial list: \");\n    display(head);\n\n    head = deleteFromBeginning(head);\n    printf(\"After deleting head: \");\n    display(head);\n\n    head = reverseList(head);\n    printf(\"Reversed list: \");\n    display(head);\n\n    freeList(head);\n    return 0;\n}",
+      "sample_io": "Output:\nInitial list: [5] -> [10] -> [20] -> [30] -> NULL\nAfter deleting head: [10] -> [20] -> [30] -> NULL\nReversed list: [30] -> [20] -> [10] -> NULL",
+      "dry_run": "Reversing list [5 -> 10 -> 20 -> 30]:\nInitial: prev=NULL, curr=5\nPass 1: next=10, 5->next=NULL, prev=5, curr=10\nPass 2: next=20, 10->next=5, prev=10, curr=20\nPass 3: next=30, 20->next=10, prev=20, curr=30\nPass 4: next=NULL, 30->next=20, prev=30, curr=NULL\nLoop terminates. Return prev (30). List is reversed.",
+      "time_complexity": "• Insert at head: O(1)\n• Insert at tail: O(n)\n• Search: O(n)\n• Reverse: O(n)",
+      "space_complexity": "O(1) auxiliary space (O(n) total memory for nodes)",
+      "viva_questions": [
+        { "q": "How many pointers are required to reverse a singly linked list iteratively?", "a": "Three pointers: `prev` (tracks preceding node), `curr` (tracks current node), and `next` (preserves remaining list before breaking the link)." },
+        { "q": "What is the difference between an array and a linked list?", "a": "Arrays have contiguous memory, fixed capacity, and O(1) random access. Linked lists have scattered heap memory, dynamic capacity, O(n) sequential access, and O(1) insertions once the target node is found." }
+      ]
+    },
+    "doubly_linked_list": {
+      "name": "Doubly Linked List (DLL)",
+      "definition": "A Doubly Linked List is a linear data structure where each node contains three fields: a data value, a pointer to the previous node (`prev`), and a pointer to the next node (`next`), enabling bidirectional traversal.",
+      "node_structure": "struct DNode {\n    int data;\n    struct DNode *prev;\n    struct DNode *next;\n};",
+      "c_program": "#include <stdio.h>\n#include <stdlib.h>\n\nstruct DNode {\n    int data;\n    struct DNode *prev;\n    struct DNode *next;\n};\n\nstruct DNode* createDNode(int val) {\n    struct DNode *n = (struct DNode *)malloc(sizeof(struct DNode));\n    n->data = val;\n    n->prev = NULL;\n    n->next = NULL;\n    return n;\n}\n\nstruct DNode* insertFront(struct DNode *head, int val) {\n    struct DNode *n = createDNode(val);\n    if (head) {\n        n->next = head;\n        head->prev = n;\n    }\n    return n;\n}\n\nstruct DNode* insertEnd(struct DNode *head, int val) {\n    struct DNode *n = createDNode(val);\n    if (!head) return n;\n    struct DNode *t = head;\n    while (t->next) t = t->next;\n    t->next = n;\n    n->prev = t;\n    return head;\n}\n\nvoid displayForward(struct DNode *head) {\n    printf(\"Forward: NULL <-> \");\n    while (head) {\n        printf(\"[%d] <-> \", head->data);\n        head = head->next;\n    }\n    printf(\"NULL\\n\");\n}\n\nint main(void) {\n    struct DNode *head = NULL;\n    head = insertEnd(head, 10);\n    head = insertEnd(head, 20);\n    head = insertFront(head, 5);\n    displayForward(head);\n    return 0;\n}",
+      "sample_io": "Output:\nForward: NULL <-> [5] <-> [10] <-> [20] <-> NULL",
+      "advantages": "Bidirectional traversal (forward and backward), O(1) deletion of a given node pointer without needing the preceding node pointer.",
+      "disadvantages": "Higher memory overhead (2 pointers per node instead of 1), extra pointer operations on insertions/deletions.",
+      "viva_questions": [
+        { "q": "What is the primary advantage of a Doubly Linked List over a Singly Linked List?", "a": "A node in a Doubly Linked List can be deleted in O(1) time if given its direct pointer, because `node->prev->next = node->next`. In a Singly Linked List, you must traverse from the head in O(n) to find the predecessor." }
+      ]
+    },
+    "circular_linked_list": {
+      "name": "Circular Linked List (CLL)",
+      "definition": "A Circular Linked List is a linked list variant where the last node points back to the first node (head), forming a continuous circular loop with no NULL termination.",
+      "node_structure": "struct CNode {\n    int data;\n    struct CNode *next;\n};",
+      "c_program": "#include <stdio.h>\n#include <stdlib.h>\n\nstruct CNode {\n    int data;\n    struct CNode *next;\n};\n\nstruct CNode* insertInCLL(struct CNode *last, int val) {\n    struct CNode *n = (struct CNode *)malloc(sizeof(struct CNode));\n    n->data = val;\n    if (!last) {\n        n->next = n;\n        return n;\n    }\n    n->next = last->next;\n    last->next = n;\n    return n;\n}\n\nvoid displayCLL(struct CNode *last) {\n    if (!last) return;\n    struct CNode *head = last->next;\n    struct CNode *curr = head;\n    printf(\"Circular: \");\n    do {\n        printf(\"[%d] -> \", curr->data);\n        curr = curr->next;\n    } while (curr != head);\n    printf(\"(head: %d)\\n\", head->data);\n}\n\nint main(void) {\n    struct CNode *last = NULL;\n    last = insertInCLL(last, 10);\n    last = insertInCLL(last, 20);\n    last = insertInCLL(last, 30);\n    displayCLL(last);\n    return 0;\n}",
+      "sample_io": "Output:\nCircular: [10] -> [20] -> [30] -> (head: 10)",
+      "applications": "Round-robin CPU process scheduling, multiplayer board games (turn rotation), media playlist looping.",
+      "viva_questions": [
+        { "q": "How is a Circular Linked List traversed without an infinite loop?", "a": "Record the pointer to the head node. Use a `do ... while (curr != head)` loop so that iteration stops when the pointer loops back to the start." }
+      ]
+    }
+  }
+}

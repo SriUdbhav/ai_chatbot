@@ -1,0 +1,46 @@
+{
+  "topic": "hashing",
+  "title": "Hashing, Hash Tables & Collision Resolution",
+  "syllabus_unit": "DS-UNIT-9",
+  "items": {
+    "hashing_fundamentals": {
+      "name": "Hashing and Hash Functions",
+      "definition": "Hashing is a technique that maps large keys of variable sizes into fixed-size values (hash codes) using a mathematical Hash Function, allowing constant-time O(1) average search, insertion, and deletion in a Hash Table.",
+      "hash_table_concept": "A Hash Table is an associative array where keys are converted by a hash function h(key) into an array index where the corresponding value or record is stored.",
+      "hash_function_properties": [
+        "Uniform Distribution: Distributes keys evenly across all table slots to minimize collisions.",
+        "Deterministic: The same key must always produce the exact same hash index.",
+        "Computational Efficiency: Fast to compute in O(1) time.",
+        "Common Hash Functions: Division method (h(k) = k % m where m is prime), Multiplication method, Mid-square method, Folding method."
+      ],
+      "load_factor": "The load factor alpha = n / m (where n = number of stored elements, m = total table size). When alpha exceeds 0.70 - 0.75, rehashing into a larger table (often double size) is performed to prevent performance degradation.",
+      "viva_questions": [
+        { "q": "What is a collision in a hash table?", "a": "A collision occurs when two distinct keys k1 != k2 produce the exact same hash index: h(k1) == h(k2)." },
+        { "q": "Why is the table size m typically chosen as a prime number in division hashing?", "a": "Choosing a prime number reduces the likelihood of common factors with keys, thereby producing a more uniform distribution and drastically reducing collisions." }
+      ]
+    },
+    "collision_resolution": {
+      "name": "Collision Resolution Techniques",
+      "definition": "Collision resolution techniques handle the situation where multiple keys map to the same hash table index. The two primary categories are Separate Chaining (Open Hashing) and Open Addressing (Closed Hashing).",
+      "techniques": {
+        "separate_chaining": "Each hash table slot points to a linked list of records that share the same hash code. Inserting is O(1), search is O(1 + alpha). Never overflows.",
+        "open_addressing": "All elements are stored directly inside the hash table array. If a collision occurs, alternative slots are probed:",
+        "linear_probing": "Sequentially searches the next slot: h(k, i) = (h'(k) + i) % m. Suffers from Primary Clustering (long contiguous blocks of occupied cells).",
+        "quadratic_probing": "Probes with quadratic intervals: h(k, i) = (h'(k) + c1*i + c2*i^2) % m. Avoids primary clustering but can suffer from Secondary Clustering.",
+        "double_hashing": "Uses a second independent hash function: h(k, i) = (h1(k) + i * h2(k)) % m. Excellent distribution, virtually eliminates clustering."
+      },
+      "comparison_table": "| Parameter | Separate Chaining (Open Hashing) | Open Addressing (Closed Hashing) |\n| :--- | :--- | :--- |\n| **Storage Mechanism** | External linked lists per slot | Everything stored inside the array |\n| **Capacity Limit** | Can store more elements than table size (alpha > 1) | Cannot exceed table size (alpha <= 1) |\n| **Deletions** | Simple linked list node deletion | Requires dummy DELETED markers to prevent broken probe chains |\n| **Memory Overhead** | Pointer overhead per node | Extra space reserved in advance |\n| **Clustering** | No clustering | Primary (linear) or Secondary (quadratic) clustering |",
+      "c_program": "#include <stdio.h>\n#include <stdbool.h>\n\n#define TABLE_SIZE 7\n#define EMPTY -1\n#define DELETED -2\n\nint hashTable[TABLE_SIZE];\n\nvoid initTable() {\n    for (int i = 0; i < TABLE_SIZE; i++) {\n        hashTable[i] = EMPTY;\n    }\n}\n\nint hashFunction(int key) {\n    return key % TABLE_SIZE;\n}\n\n// Insert using Linear Probing: (h(k) + i) % TABLE_SIZE\nvoid insert(int key) {\n    int index = hashFunction(key);\n    for (int i = 0; i < TABLE_SIZE; i++) {\n        int probeIndex = (index + i) % TABLE_SIZE;\n        if (hashTable[probeIndex] == EMPTY || hashTable[probeIndex] == DELETED) {\n            hashTable[probeIndex] = key;\n            printf(\"Key %d inserted at index %d (Probes: %d)\\n\", key, probeIndex, i + 1);\n            return;\n        }\n    }\n    printf(\"Hash table is full! Cannot insert %d\\n\", key);\n}\n\n// Search using Linear Probing\nint search(int key) {\n    int index = hashFunction(key);\n    for (int i = 0; i < TABLE_SIZE; i++) {\n        int probeIndex = (index + i) % TABLE_SIZE;\n        if (hashTable[probeIndex] == key) return probeIndex;\n        if (hashTable[probeIndex] == EMPTY) return -1; // End of chain\n    }\n    return -1;\n}\n\nvoid display() {\n    printf(\"\\n--- Hash Table (Size %d) ---\\n\", TABLE_SIZE);\n    for (int i = 0; i < TABLE_SIZE; i++) {\n        if (hashTable[i] == EMPTY) printf(\"[%d] : EMPTY\\n\", i);\n        else if (hashTable[i] == DELETED) printf(\"[%d] : DELETED\\n\", i);\n        else printf(\"[%d] : %d\\n\", i, hashTable[i]);\n    }\n}\n\nint main(void) {\n    initTable();\n    insert(10); // 10 % 7 = 3\n    insert(17); // 17 % 7 = 3 (Collision! Probes to index 4)\n    insert(24); // 24 % 7 = 3 (Collision! Probes to index 5)\n    insert(15); // 15 % 7 = 1\n    display();\n\n    int key = 17;\n    int foundIdx = search(key);\n    if (foundIdx != -1) {\n        printf(\"\\nSearch: Key %d found at index %d.\\n\", key, foundIdx);\n    } else {\n        printf(\"\\nSearch: Key %d not found.\\n\", key);\n    }\n    return 0;\n}",
+      "sample_io": "Output:\nKey 10 inserted at index 3 (Probes: 1)\nKey 17 inserted at index 4 (Probes: 2)\nKey 24 inserted at index 5 (Probes: 3)\nKey 15 inserted at index 1 (Probes: 1)\n\n--- Hash Table (Size 7) ---\n[0] : EMPTY\n[1] : 15\n[2] : EMPTY\n[3] : 10\n[4] : 17\n[5] : 24\n[6] : EMPTY\n\nSearch: Key 17 found at index 4.",
+      "dry_run": "Insert Keys: 10, 17, 24 with Table Size = 7\n1. Key 10: h(10) = 10 % 7 = 3. Slot 3 is EMPTY. Store 10 at [3].\n2. Key 17: h(17) = 17 % 7 = 3. Slot 3 has 10 (COLLISION!).\n   Probe i=1: (3 + 1) % 7 = 4. Slot 4 is EMPTY. Store 17 at [4].\n3. Key 24: h(24) = 24 % 7 = 3. Slot 3 occupied (10), Slot 4 occupied (17).\n   Probe i=2: (3 + 2) % 7 = 5. Slot 5 is EMPTY. Store 24 at [5].\nSearch Key 17: h(17) = 3. arr[3]=10 != 17. Next: arr[4]=17 == 17! Found in 2 probes.",
+      "time_complexity": "• Best Case: O(1)\n• Average Case: O(1) (Under low load factor alpha < 0.7)\n• Worst Case: O(n) (When all keys collide into the same slot/chain)",
+      "space_complexity": "O(m) where m is table size.",
+      "applications": "Compiler symbol tables, database indexing, caching (Redis/Memcached), cryptographic verification, associative arrays in languages like Python dict and JavaScript Map.",
+      "viva_questions": [
+        { "q": "What is primary clustering in linear probing?", "a": "Primary clustering occurs when occupied slots cluster together in contiguous blocks. Any key hashing into or near this block increases its length, exponentially increasing search and insertion times." },
+        { "q": "How does Double Hashing prevent clustering?", "a": "Double hashing uses a second hash function h2(k) as the probe step size: probe = (h1(k) + i * h2(k)) % m. Different keys that collide under h1(k) take different probe jump sizes, breaking up clusters." }
+      ]
+    }
+  }
+}
+

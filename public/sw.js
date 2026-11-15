@@ -5,7 +5,8 @@
 
 'use strict';
 
-const CACHE_VERSION = 'v1.4.0';
+// History: CACHE_VERSION = 'v1.2.0', CACHE_VERSION = 'v1.2.1', CACHE_VERSION = 'v1.4.0'
+const CACHE_VERSION = 'v1.5.0';
 const STATIC_CACHE = `studymate-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `studymate-runtime-${CACHE_VERSION}`;
 
@@ -27,6 +28,7 @@ const PRECACHE_ASSETS = [
   '/js/webllm-worker.js',
   '/js/web-llm.js',
   '/js/jszip.min.js',
+  '/knowledge/data-structures/fundamentals.json',
   '/knowledge/data-structures/searching.json',
   '/knowledge/data-structures/sorting.json',
   '/knowledge/data-structures/linked-lists.json',
@@ -34,6 +36,8 @@ const PRECACHE_ASSETS = [
   '/knowledge/data-structures/queues.json',
   '/knowledge/data-structures/circular-queues.json',
   '/knowledge/data-structures/binary-trees.json',
+  '/knowledge/data-structures/graphs.json',
+  '/knowledge/data-structures/hashing.json',
   '/knowledge/data-structures/complexity.json',
   '/knowledge/data-structures/viva.json',
   '/manifest.webmanifest',

@@ -1,0 +1,53 @@
+{
+  "topic": "queues",
+  "title": "Linear Queue Using Arrays",
+  "definition": "A Queue is a linear data structure that operates under the FIFO (First In, First Out) principle, where elements are inserted at the back end (rear) and removed from the front end (front).",
+  "fifo_principle": "The element that enters first is the first to be serviced and leave. Real-world analogy: People standing in a ticket counter queue or a printer document job spooler.",
+  "front_rear_pointers": {
+    "initial_state": "front = -1, rear = -1 (indicates empty queue)",
+    "first_element_enqueue": "Both front and rear become 0",
+    "enqueue": "rear increments: rear++",
+    "dequeue": "front increments: front++",
+    "underflow_condition": "front == -1 || front > rear",
+    "overflow_condition": "rear == MAX - 1"
+  },
+  "c_program": "#include <stdio.h>\n#define MAX 5\n\nint queue[MAX];\nint front = -1;\nint rear = -1;\n\n// Enqueue: Insert element at rear: O(1)\nvoid enqueue(int value) {\n    if (rear == MAX - 1) {\n        printf(\"Queue Overflow! Cannot enqueue %d (rear reached MAX-1).\\n\", value);\n        return;\n    }\n    if (front == -1) {\n        front = 0; // First element being inserted\n    }\n    queue[++rear] = value;\n    printf(\"Enqueued %d (front = %d, rear = %d).\\n\", value, front, rear);\n}\n\n// Dequeue: Remove element from front: O(1)\nint dequeue(void) {\n    if (front == -1 || front > rear) {\n        printf(\"Queue Underflow! Queue is empty.\\n\");\n        return -1;\n    }\n    int dequeuedValue = queue[front++];\n    printf(\"Dequeued %d (front = %d, rear = %d).\\n\", dequeuedValue, front, rear);\n    // Reset queue when all elements have been dequeued\n    if (front > rear) {\n        front = -1;\n        rear = -1;\n    }\n    return dequeuedValue;\n}\n\n// Display elements from front to rear: O(n)\nvoid display(void) {\n    if (front == -1 || front > rear) {\n        printf(\"Queue is empty.\\n\");\n        return;\n    }\n    printf(\"Queue elements: \");\n    for (int i = front; i <= rear; i++) {\n        printf(\"%d \", queue[i]);\n    }\n    printf(\"\\n\");\n}\n\nint main(void) {\n    printf(\"--- Linear Queue Implementation in C ---\\n\");\n    enqueue(10);\n    enqueue(20);\n    enqueue(30);\n    display(); // 10 20 30\n\n    dequeue(); // Removes 10\n    display(); // 20 30\n\n    enqueue(40);\n    enqueue(50); // Fills to rear = 4\n    display();\n\n    enqueue(60); // Triggers Queue Overflow\n    return 0;\n}",
+  "dry_run": [
+    "Initial: front = -1, rear = -1, queue = [?, ?, ?, ?, ?]",
+    "enqueue(10): front = 0, rear = 0, queue[0] = 10 -> [10, ?, ?, ?, ?]",
+    "enqueue(20): front = 0, rear = 1, queue[1] = 20 -> [10, 20, ?, ?, ?]",
+    "enqueue(30): front = 0, rear = 2, queue[2] = 30 -> [10, 20, 30, ?, ?]",
+    "dequeue(): returns queue[0] (10), increments front = 1 -> [?, 20, 30, ?, ?]",
+    "enqueue(40): rear = 3, queue[3] = 40",
+    "enqueue(50): rear = 4, queue[4] = 50 (rear == MAX - 1)",
+    "enqueue(60): rear == 4 (MAX-1) is TRUE -> Queue Overflow is reported even though index 0 is empty!"
+  ],
+  "linear_queue_limitation": "The major drawback of a linear array queue is FALSE OVERFLOW (memory waste). When elements are dequeued, the front pointer moves forward, leaving unused vacant slots at the front of the array. Even if slots 0, 1, 2 are empty, if rear == MAX - 1, no new elements can be enqueued. This limitation directly necessitates Circular Queues.",
+  "time_complexity": {
+    "enqueue": "O(1)",
+    "dequeue": "O(1)",
+    "display": "O(n)"
+  },
+  "space_complexity": "O(MAX) static array memory.",
+  "applications": [
+    "CPU Scheduling: Ready queue in multiprogramming operating systems (e.g. Round Robin, FCFS).",
+    "Print Spooling: Printing documents in the exact order submitted.",
+    "Graph Traversal: Breadth-First Search (BFS) uses a queue to visit vertices level by level.",
+    "Buffering: Real-time asynchronous data buffers (e.g., keyboard keystrokes buffer, network socket packet buffers)."
+  ],
+  "viva_questions": [
+    {
+      "question": "What is false overflow in a linear queue?",
+      "answer": "False overflow occurs when the rear pointer reaches MAX - 1, triggering an overflow error, even though elements were previously dequeued and empty slots exist at the front of the array."
+    },
+    {
+      "question": "How can false overflow be resolved without shifting array elements?",
+      "answer": "By using a Circular Queue, where the rear wraps around to index 0 using the modulo operator: '(rear + 1) % MAX'."
+    },
+    {
+      "question": "What is the underflow condition for a linear queue?",
+      "answer": "'front == -1' or 'front > rear'."
+    }
+  ]
+}
+

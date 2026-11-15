@@ -1,0 +1,53 @@
+{
+  "topic": "stacks",
+  "title": "Stack Data Structure & Applications",
+  "syllabus_unit": "DS-UNIT-4",
+  "items": {
+    "stack_array": {
+      "name": "Stack Implementation Using Arrays",
+      "definition": "A Stack is a linear data structure operating under the LIFO (Last-In, First-Out) principle, where all insertions (push) and deletions (pop) occur strictly at a single end termed the 'top'.",
+      "overflow_underflow": {
+        "overflow": "Occurs when pushing onto a full stack: top == MAX - 1.",
+        "underflow": "Occurs when popping from an empty stack: top == -1."
+      },
+      "c_program": "#include <stdio.h>\n#define MAX 5\n\nint stack[MAX];\nint top = -1;\n\nvoid push(int val) {\n    if (top == MAX - 1) {\n        printf(\"Stack Overflow! Cannot push %d\\n\", val);\n        return;\n    }\n    stack[++top] = val;\n    printf(\"Pushed %d (top = %d)\\n\", val, top);\n}\n\nint pop(void) {\n    if (top == -1) {\n        printf(\"Stack Underflow! Stack is empty\\n\");\n        return -1;\n    }\n    return stack[top--];\n}\n\nint peek(void) {\n    if (top == -1) return -1;\n    return stack[top];\n}\n\nvoid display(void) {\n    if (top == -1) {\n        printf(\"Stack is empty\\n\");\n        return;\n    }\n    printf(\"Stack (top to bottom): \");\n    for (int i = top; i >= 0; i--) printf(\"%d \", stack[i]);\n    printf(\"\\n\");\n}\n\nint main(void) {\n    push(10);\n    push(20);\n    push(30);\n    display();\n    printf(\"Top element: %d\\n\", peek());\n    printf(\"Popped: %d\\n\", pop());\n    display();\n    return 0;\n}",
+      "sample_io": "Output:\nPushed 10 (top = 0)\nPushed 20 (top = 1)\nPushed 30 (top = 2)\nStack (top to bottom): 30 20 10\nTop element: 30\nPopped: 30\nStack (top to bottom): 20 10",
+      "dry_run": "top = -1\npush(10) -> top=0, stack[0]=10\npush(20) -> top=1, stack[1]=20\npush(30) -> top=2, stack[2]=30\npeek() -> returns stack[2] = 30\npop() -> returns stack[2] = 30, top becomes 1.",
+      "time_complexity": "push: O(1), pop: O(1), peek: O(1), display: O(n)",
+      "space_complexity": "O(MAX) static array memory, O(1) auxiliary per operation.",
+      "viva_questions": [
+        { "q": "What is the condition for stack overflow in C?", "a": "top == MAX - 1 (in a 0-indexed array of capacity MAX)." },
+        { "q": "What is the condition for stack underflow?", "a": "top == -1." }
+      ]
+    },
+    "infix_to_postfix": {
+      "name": "Infix to Postfix Conversion",
+      "definition": "Infix to Postfix conversion translates an algebraic expression from human-readable infix form (A + B * C) into reverse Polish notation (A B C * +) where operators follow their operands, eliminating the need for parentheses during machine evaluation.",
+      "rules": [
+        "Operands: Output directly to the postfix expression.",
+        "Left Parenthesis '(': Push onto the stack.",
+        "Right Parenthesis ')': Pop and output operators from stack until '(' is encountered, then discard '('.",
+        "Operators: While stack top has higher or equal precedence, pop and output stack top. Then push current operator."
+      ],
+      "c_program": "#include <stdio.h>\n#include <ctype.h>\n#include <string.h>\n\nchar stack[100];\nint top = -1;\n\nvoid push(char c) { stack[++top] = c; }\nchar pop() { return (top == -1) ? -1 : stack[top--]; }\nchar peek() { return (top == -1) ? -1 : stack[top]; }\n\nint precedence(char op) {\n    if (op == '^') return 3;\n    if (op == '*' || op == '/') return 2;\n    if (op == '+' || op == '-') return 1;\n    return 0;\n}\n\nvoid infixToPostfix(char infix[], char postfix[]) {\n    int k = 0;\n    for (int i = 0; infix[i] != '\\0'; i++) {\n        char ch = infix[i];\n        if (isalnum(ch)) {\n            postfix[k++] = ch;\n        } else if (ch == '(') {\n            push(ch);\n        } else if (ch == ')') {\n            while (top != -1 && peek() != '(') {\n                postfix[k++] = pop();\n            }\n            pop(); // Remove '('\n        } else {\n            while (top != -1 && precedence(peek()) >= precedence(ch)) {\n                postfix[k++] = pop();\n            }\n            push(ch);\n        }\n    }\n    while (top != -1) postfix[k++] = pop();\n    postfix[k] = '\\0';\n}\n\nint main(void) {\n    char infix[] = \"(A+B)*C-D/E\";\n    char postfix[100];\n    infixToPostfix(infix, postfix);\n    printf(\"Infix:   %s\\n\", infix);\n    printf(\"Postfix: %s\\n\", postfix);\n    return 0;\n}",
+      "sample_io": "Output:\nInfix:   (A+B)*C-D/E\nPostfix: AB+C*DE/-",
+      "dry_run": "Infix: (A+B)*C-D/E\n1. '(' -> push onto stack: ['(']\n2. 'A' -> output: 'A'\n3. '+' -> push: ['(', '+']\n4. 'B' -> output: 'AB'\n5. ')' -> pop until '(' -> output 'AB+', stack empty.\n6. '*' -> push: ['*']\n7. 'C' -> output: 'AB+C'\n8. '-' -> precedence('-') <= precedence('*'), pop '*' -> output 'AB+C*', push '-' -> ['-']\n9. 'D' -> output: 'AB+C*D'\n10. '/' -> precedence('/') > precedence('-'), push '/' -> ['-', '/']\n11. 'E' -> output: 'AB+C*DE'\n12. Pop remaining -> output 'AB+C*DE/-'.",
+      "time_complexity": "O(n) where n is length of expression.",
+      "space_complexity": "O(n) auxiliary stack space.",
+      "viva_questions": [
+        { "q": "Why do computers convert infix expressions to postfix?", "a": "Postfix expressions have no parentheses and follow a strict linear order of evaluation using a stack, eliminating operator precedence conflicts at runtime." }
+      ]
+    },
+    "parentheses_matching": {
+      "name": "Balanced Parentheses / Bracket Matching",
+      "definition": "Parentheses matching checks whether brackets in a string are correctly paired and nested (i.e. every opening bracket has a corresponding closing bracket of matching type in the correct order).",
+      "c_program": "#include <stdio.h>\n#include <stdbool.h>\n#include <string.h>\n\nbool isMatchingPair(char open, char close) {\n    return (open == '(' && close == ')') ||\n           (open == '{' && close == '}') ||\n           (open == '[' && close == ']');\n}\n\nbool checkBalanced(char exp[]) {\n    char stack[100];\n    int top = -1;\n\n    for (int i = 0; exp[i] != '\\0'; i++) {\n        char ch = exp[i];\n        if (ch == '(' || ch == '{' || ch == '[') {\n            stack[++top] = ch;\n        } else if (ch == ')' || ch == '}' || ch == ']') {\n            if (top == -1) return false; // Closing without opening\n            char open = stack[top--];\n            if (!isMatchingPair(open, ch)) return false; // Mismatched type\n        }\n    }\n    return top == -1; // True if stack completely empty\n}\n\nint main(void) {\n    char exp1[] = \"{[()]}\";\n    char exp2[] = \"{[(])}\";\n    printf(\"%s is %s\\n\", exp1, checkBalanced(exp1) ? \"BALANCED\" : \"NOT BALANCED\");\n    printf(\"%s is %s\\n\", exp2, checkBalanced(exp2) ? \"BALANCED\" : \"NOT BALANCED\");\n    return 0;\n}",
+      "sample_io": "Output:\n{[()]} is BALANCED\n{[(])} is NOT BALANCED",
+      "time_complexity": "O(n) single pass scan.",
+      "space_complexity": "O(n) worst-case stack space.",
+      "viva_questions": [
+        { "q": "What indicates unbalanced parentheses at the end of the string scan?", "a": "If the stack is not empty (top != -1), it indicates unmatched opening brackets remaining." }
+      ]
+    }
+  }
+}

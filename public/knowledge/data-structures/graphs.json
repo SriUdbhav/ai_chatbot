@@ -1,0 +1,78 @@
+{
+  "topic": "graphs",
+  "title": "Graph Data Structures & Traversals (BFS & DFS)",
+  "syllabus_unit": "DS-UNIT-8",
+  "items": {
+    "graph_fundamentals": {
+      "name": "Graph Fundamentals and Representations",
+      "definition": "A Graph G = (V, E) is a non-linear data structure consisting of a finite set of vertices (or nodes) V and a set of edges E that connect pairs of vertices.",
+      "terminology": [
+        "Vertex (Node): A fundamental data element in a graph.",
+        "Edge: An arc or link between two vertices (u, v).",
+        "Directed Graph (Digraph): Edges have direction (ordered pairs).",
+        "Undirected Graph: Edges are bidirectional (unordered pairs).",
+        "Weighted Graph: Edges carry numerical costs/weights.",
+        "Degree: In undirected graphs, number of connected edges. In directed graphs, split into In-degree and Out-degree."
+      ],
+      "representations": {
+        "adjacency_matrix": "A 2D array of size V x V where adj[i][j] = 1 if an edge exists between vertex i and j, else 0. Space: O(V^2). Efficient for dense graphs (edge lookup in O(1)).",
+        "adjacency_list": "An array of linked lists of size V where adjList[i] stores all adjacent vertices of i. Space: O(V + E). Efficient for sparse graphs."
+      },
+      "comparison_table": "| Parameter | Adjacency Matrix | Adjacency List |\n| :--- | :--- | :--- |\n| **Space Complexity** | O(V^2) | O(V + E) |\n| **Edge Lookup (u, v)** | O(1) instantaneous | O(degree(u)) requires list search |\n| **Add Vertex** | O(V^2) requires reallocating matrix | O(1) |\n| **Best For** | Dense graphs (E ≈ V^2) | Sparse graphs (E << V^2) |",
+      "viva_questions": [
+        { "q": "What is the space complexity of an Adjacency Matrix for a graph with V vertices?", "a": "O(V^2), regardless of the number of edges." },
+        { "q": "Why is an Adjacency List preferred for sparse graphs?", "a": "Sparse graphs have few edges (E << V^2). Adjacency list uses O(V + E) memory, whereas an adjacency matrix wastes massive memory storing zeroes (O(V^2))." }
+      ]
+    },
+    "breadth_first_search": {
+      "name": "Breadth-First Search (BFS)",
+      "type": "algorithm",
+      "definition": "Breadth-First Search (BFS) is a graph traversal algorithm that explores all vertices at the current depth/distance before moving on to vertices at the next depth level, using a FIFO Queue.",
+      "explanation": "Starting at a source vertex, BFS marks it as visited and enqueues it. In each step, it dequeues a vertex, prints it, and visits/enqueues all its unvisited adjacent neighbors. It computes the shortest path in unweighted graphs.",
+      "algorithm": [
+        "1. Create a boolean array `visited` of size V initialized to false, and an empty Queue Q.",
+        "2. Mark the starting vertex `start` as visited and enqueue it into Q.",
+        "3. While Q is not empty:",
+        "   a. Dequeue front vertex `u` and display it.",
+        "   b. For each adjacent vertex `v` of `u`:",
+        "      i. If `v` has not been visited, mark `visited[v] = true` and enqueue `v`.",
+        "4. Repeat until Queue is empty."
+      ],
+      "c_program": "#include <stdio.h>\n#include <stdbool.h>\n\n#define MAX 20\n\nint queue[MAX];\nint front = -1, rear = -1;\n\nvoid enqueue(int v) {\n    if (rear == MAX - 1) return;\n    if (front == -1) front = 0;\n    queue[++rear] = v;\n}\n\nint dequeue() {\n    if (front == -1 || front > rear) return -1;\n    return queue[front++];\n}\n\nbool isQueueEmpty() {\n    return front == -1 || front > rear;\n}\n\nvoid BFS(int adj[MAX][MAX], int V, int startVertex) {\n    bool visited[MAX] = {false};\n\n    visited[startVertex] = true;\n    enqueue(startVertex);\n\n    printf(\"BFS Traversal starting from vertex %d: \", startVertex);\n\n    while (!isQueueEmpty()) {\n        int curr = dequeue();\n        printf(\"%d \", curr);\n\n        for (int i = 0; i < V; i++) {\n            if (adj[curr][i] == 1 && !visited[i]) {\n                visited[i] = true;\n                enqueue(i);\n            }\n        }\n    }\n    printf(\"\\n\");\n}\n\nint main(void) {\n    int V = 4;\n    int adj[MAX][MAX] = {\n        {0, 1, 1, 0},\n        {1, 0, 0, 1},\n        {1, 0, 0, 1},\n        {0, 1, 1, 0}\n    };\n\n    BFS(adj, V, 0);\n    return 0;\n}",
+      "sample_io": "Input: 4 vertices connected in a ring (0-1, 0-2, 1-3, 2-3), Start = 0\nOutput: BFS Traversal starting from vertex 0: 0 1 2 3",
+      "dry_run": "Graph: 0-(1,2), 1-(3), 2-(3)\n1. Start at 0: visited[0]=true, Enqueue(0). Queue=[0]\n2. Dequeue 0, print '0'. Neighbors of 0 are 1 and 2.\n   visited[1]=true, Enqueue(1). visited[2]=true, Enqueue(2). Queue=[1, 2]\n3. Dequeue 1, print '1'. Neighbors of 1 are 0 (visited) and 3.\n   visited[3]=true, Enqueue(3). Queue=[2, 3]\n4. Dequeue 2, print '2'. Neighbors 0 and 3 are already visited.\n5. Dequeue 3, print '3'. No unvisited neighbors.\n6. Queue is empty. Sequence: 0 -> 1 -> 2 -> 3.",
+      "time_complexity": "• Adjacency List: O(V + E)\n• Adjacency Matrix: O(V^2)",
+      "space_complexity": "O(V) auxiliary space for visited array and FIFO queue.",
+      "applications": "Shortest path in unweighted graphs, GPS navigation, peer-to-peer torrent chunk discovery, web crawlers.",
+      "viva_questions": [
+        { "q": "Which data structure is used to implement BFS?", "a": "A FIFO Queue (First-In, First-Out)." },
+        { "q": "Can BFS find the shortest path in a weighted graph?", "a": "No, standard BFS only guarantees the shortest path in UNWEIGHTED graphs. For non-negative weighted graphs, Dijkstra's algorithm is used." }
+      ]
+    },
+    "depth_first_search": {
+      "name": "Depth-First Search (DFS)",
+      "type": "algorithm",
+      "definition": "Depth-First Search (DFS) is a graph traversal algorithm that explores as far as possible along each branch before backtracking, utilizing a LIFO Stack or recursive call stack.",
+      "explanation": "Starting at a root vertex, DFS marks it visited and explores the first unvisited neighbor recursively. When it hits a dead end (no unvisited neighbors), it backtracks to previous decision points.",
+      "algorithm": [
+        "1. Create a boolean array `visited` initialized to false.",
+        "2. Call recursive helper `DFSUtil(u, visited)`:",
+        "   a. Mark `visited[u] = true` and print `u`.",
+        "   b. For every adjacent vertex `v` of `u`:",
+        "      i. If `!visited[v]`, recursively call `DFSUtil(v, visited)`.",
+        "3. In disconnected graphs, loop through all vertices and call DFSUtil on unvisited ones."
+      ],
+      "c_program": "#include <stdio.h>\n#include <stdbool.h>\n\n#define MAX 20\n\nvoid DFSUtil(int adj[MAX][MAX], int V, int u, bool visited[]) {\n    visited[u] = true;\n    printf(\"%d \", u);\n\n    for (int v = 0; v < V; v++) {\n        if (adj[u][v] == 1 && !visited[v]) {\n            DFSUtil(adj, V, v, visited);\n        }\n    }\n}\n\nvoid DFS(int adj[MAX][MAX], int V, int startVertex) {\n    bool visited[MAX] = {false};\n    printf(\"DFS Traversal starting from vertex %d: \", startVertex);\n    DFSUtil(adj, V, startVertex, visited);\n    printf(\"\\n\");\n}\n\nint main(void) {\n    int V = 4;\n    int adj[MAX][MAX] = {\n        {0, 1, 1, 0},\n        {1, 0, 0, 1},\n        {1, 0, 0, 1},\n        {0, 1, 1, 0}\n    };\n\n    DFS(adj, V, 0);\n    return 0;\n}",
+      "sample_io": "Input: 4 vertices connected in a ring (0-1, 0-2, 1-3, 2-3), Start = 0\nOutput: DFS Traversal starting from vertex 0: 0 1 3 2",
+      "dry_run": "Graph: 0-(1,2), 1-(3), 2-(3)\n1. Visit 0, print '0'. visited[0]=true.\n2. Neighbor 1 is unvisited -> Recurse DFS(1).\n3. Visit 1, print '1'. visited[1]=true.\n4. Neighbor 3 is unvisited -> Recurse DFS(3).\n5. Visit 3, print '3'. visited[3]=true.\n6. Neighbor 2 is unvisited -> Recurse DFS(2).\n7. Visit 2, print '2'. visited[2]=true. Dead end. Backtrack.\nTraversal: 0 -> 1 -> 3 -> 2.",
+      "time_complexity": "• Adjacency List: O(V + E)\n• Adjacency Matrix: O(V^2)",
+      "space_complexity": "O(V) recursion call stack depth.",
+      "applications": "Cycle detection in directed/undirected graphs, Topological sorting for task build systems, solving mazes, bipartite graph checking.",
+      "viva_questions": [
+        { "q": "What data structure does DFS use?", "a": "A LIFO Stack (either the system recursion call stack or an explicit stack data structure)." },
+        { "q": "What is the difference between BFS and DFS?", "a": "BFS traverses level-by-level using a FIFO Queue and finds the shortest path in unweighted graphs. DFS dives deep down a single branch before backtracking using a LIFO Stack." }
+      ]
+    }
+  }
+}
+

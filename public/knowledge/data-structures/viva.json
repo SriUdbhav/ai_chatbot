@@ -1,0 +1,121 @@
+{
+  "topic": "viva",
+  "title": "College Data Structures Examination Viva Practice Questions",
+  "questions": [
+    {
+      "id": "viva-1",
+      "category": "Searching",
+      "question": "What is the difference between Linear Search and Binary Search?",
+      "answer": "Linear Search checks elements sequentially, works on unsorted arrays and linked lists, and takes O(n) time. Binary Search repeatedly divides a sorted array in half, requires O(1) random access, and takes O(log n) time."
+    },
+    {
+      "id": "viva-2",
+      "category": "Searching",
+      "question": "Why is 'mid = low + (high - low) / 2' preferred over 'mid = (low + high) / 2' in Binary Search?",
+      "answer": "In C, when low + high exceeds the maximum 32-bit signed integer value (2,147,483,647), arithmetic overflow occurs resulting in a negative number, which triggers segmentation faults. 'low + (high - low) / 2' avoids this overflow."
+    },
+    {
+      "id": "viva-3",
+      "category": "Sorting",
+      "question": "What is the difference between Stable and Unstable sorting algorithms?",
+      "answer": "A sorting algorithm is stable if it preserves the relative order of duplicate elements with equal keys in the sorted output (e.g. Bubble Sort, Merge Sort). It is unstable if equal elements may be swapped out of their relative initial order (e.g. Selection Sort, Quick Sort)."
+    },
+    {
+      "id": "viva-4",
+      "category": "Sorting",
+      "question": "What is an In-place sorting algorithm?",
+      "answer": "An in-place sorting algorithm requires only O(1) or O(log n) auxiliary memory beyond the input array itself (e.g. Bubble Sort, Selection Sort, Quick Sort). Merge Sort is out-of-place because it requires O(n) extra space."
+    },
+    {
+      "id": "viva-5",
+      "category": "Sorting",
+      "question": "When does Quick Sort exhibit its worst-case O(n^2) performance and how can it be avoided?",
+      "answer": "Quick Sort degrades to O(n^2) when the pivot selected is consistently the minimum or maximum element (e.g. choosing the last element on an already sorted array). It can be prevented using Randomized Pivot selection or Median-of-Three."
+    },
+    {
+      "id": "viva-6",
+      "category": "Linked Lists",
+      "question": "What is the advantage of a Singly Linked List over an Array?",
+      "answer": "Linked lists have dynamic size (can grow/shrink at runtime), do not require contiguous memory allocation, and insert/delete at the beginning in O(1) time without shifting elements."
+    },
+    {
+      "id": "viva-7",
+      "category": "Linked Lists",
+      "question": "What is a Memory Leak and how do you prevent it in C linked lists?",
+      "answer": "A memory leak happens when heap memory allocated with malloc() is orphaned without being released with free(). It is prevented by explicitly calling free(temp) whenever a node is deleted and traversing the entire list calling free() when tearing it down."
+    },
+    {
+      "id": "viva-8",
+      "category": "Stacks",
+      "question": "What is LIFO and where is a Stack used in real-world systems?",
+      "answer": "LIFO stands for Last In First Out. Stacks are used in OS function call stacks (activation records), backtracking, syntax parsing (balanced brackets), undo/redo histories, and infix-to-postfix expression evaluation."
+    },
+    {
+      "id": "viva-9",
+      "category": "Queues",
+      "question": "What is False Overflow in a Linear Queue?",
+      "answer": "False Overflow occurs when 'rear == MAX - 1', preventing further insertions even though elements have been dequeued and empty slots exist at the front of the array."
+    },
+    {
+      "id": "viva-10",
+      "category": "Circular Queues",
+      "question": "How does a Circular Queue solve the False Overflow problem?",
+      "answer": "By using modulo arithmetic '(rear + 1) % MAX', the rear pointer wraps around to index 0 when it reaches the end of the array, reusing all vacated slots."
+    },
+    {
+      "id": "viva-11",
+      "category": "Circular Queues",
+      "question": "What are the Full and Empty conditions for a Circular Queue?",
+      "answer": "Full condition: '(rear + 1) % MAX == front'. Empty condition: 'front == -1'."
+    },
+    {
+      "id": "viva-12",
+      "category": "Binary Trees",
+      "question": "What property defines a Binary Search Tree (BST)?",
+      "answer": "For every node X in a BST, all node values in its left subtree are strictly less than X, and all node values in its right subtree are strictly greater than X."
+    },
+    {
+      "id": "viva-13",
+      "category": "Binary Trees",
+      "question": "Which traversal of a BST gives values in ascending sorted order?",
+      "answer": "Inorder traversal (Left, Root, Right). Since left < root < right in a BST, traversing Left then Root then Right outputs values in strictly sorted order."
+    },
+    {
+      "id": "viva-14",
+      "category": "Binary Trees",
+      "question": "What is a Leaf node and what is its degree?",
+      "answer": "A leaf node is a terminal node with no children (left == NULL and right == NULL). Its degree is 0."
+    },
+    {
+      "id": "viva-15",
+      "category": "Sorting",
+      "question": "Why is Insertion Sort adaptive and when is it O(n)?",
+      "answer": "Insertion sort is adaptive because its inner loop breaks as soon as an element in the sorted portion is smaller than the key. If the array is already sorted, it runs in O(n) linear time with zero shifts."
+    },
+    {
+      "id": "viva-16",
+      "category": "Linked Lists",
+      "question": "What is the difference between Singly and Doubly Linked Lists?",
+      "answer": "A singly linked list has only a 'next' pointer (forward only). A doubly linked list has both 'prev' and 'next' pointers (bidirectional), allowing O(1) node deletion given a direct pointer, at the cost of extra memory."
+    },
+    {
+      "id": "viva-17",
+      "category": "Graphs",
+      "question": "What is the difference between BFS and DFS in graphs?",
+      "answer": "BFS traverses level-by-level using a FIFO Queue and finds the shortest path in unweighted graphs. DFS explores deep along each branch before backtracking using a LIFO Stack."
+    },
+    {
+      "id": "viva-18",
+      "category": "Hashing",
+      "question": "What is a Collision in a Hash Table and how is it resolved?",
+      "answer": "A collision occurs when two distinct keys hash to the same table index (h(k1) == h(k2)). It is resolved using Separate Chaining (linked lists at slots) or Open Addressing (Linear Probing, Quadratic Probing, Double Hashing)."
+    },
+    {
+      "id": "viva-19",
+      "category": "Hashing",
+      "question": "What is the Load Factor in a hash table?",
+      "answer": "The load factor alpha = n / m, where n is number of stored elements and m is table capacity. When alpha exceeds 0.70 - 0.75, rehashing into a larger table is performed to preserve O(1) performance."
+    }
+  ]
+}
+

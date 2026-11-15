@@ -1,0 +1,150 @@
+{
+  "topic": "complexity",
+  "title": "Data Structures & Algorithms Complexity Master Reference",
+  "big_o_summary_table": [
+    {
+      "name": "Linear Search",
+      "best_time": "O(1)",
+      "average_time": "O(n)",
+      "worst_time": "O(n)",
+      "space": "O(1)",
+      "stable": "N/A",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Binary Search",
+      "best_time": "O(1)",
+      "average_time": "O(log n)",
+      "worst_time": "O(log n)",
+      "space": "O(1)",
+      "stable": "N/A",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Selection Sort",
+      "best_time": "O(n^2)",
+      "average_time": "O(n^2)",
+      "worst_time": "O(n^2)",
+      "space": "O(1)",
+      "stable": "No",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Bubble Sort",
+      "best_time": "O(n) (Optimized)",
+      "average_time": "O(n^2)",
+      "worst_time": "O(n^2)",
+      "space": "O(1)",
+      "stable": "Yes",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Insertion Sort",
+      "best_time": "O(n)",
+      "average_time": "O(n^2)",
+      "worst_time": "O(n^2)",
+      "space": "O(1)",
+      "stable": "Yes",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Merge Sort",
+      "best_time": "O(n log n)",
+      "average_time": "O(n log n)",
+      "worst_time": "O(n log n)",
+      "space": "O(n)",
+      "stable": "Yes",
+      "in_place": "No"
+    },
+    {
+      "name": "Quick Sort",
+      "best_time": "O(n log n)",
+      "average_time": "O(n log n)",
+      "worst_time": "O(n^2)",
+      "space": "O(log n)",
+      "stable": "No",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Singly Linked List (Insert Head)",
+      "best_time": "O(1)",
+      "average_time": "O(1)",
+      "worst_time": "O(1)",
+      "space": "O(1)",
+      "stable": "N/A",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Singly Linked List (Insert Tail)",
+      "best_time": "O(n) / O(1)*",
+      "average_time": "O(n) / O(1)*",
+      "worst_time": "O(n) / O(1)*",
+      "space": "O(1)",
+      "stable": "N/A",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Stack (Push / Pop / Peek)",
+      "best_time": "O(1)",
+      "average_time": "O(1)",
+      "worst_time": "O(1)",
+      "space": "O(MAX)",
+      "stable": "N/A",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Queue (Enqueue / Dequeue)",
+      "best_time": "O(1)",
+      "average_time": "O(1)",
+      "worst_time": "O(1)",
+      "space": "O(MAX)",
+      "stable": "N/A",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Circular Queue (Enqueue / Dequeue)",
+      "best_time": "O(1)",
+      "average_time": "O(1)",
+      "worst_time": "O(1)",
+      "space": "O(MAX)",
+      "stable": "N/A",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Binary Search Tree (Search / Insert)",
+      "best_time": "O(1)",
+      "average_time": "O(log n)",
+      "worst_time": "O(n) (Skewed)",
+      "space": "O(h)",
+      "stable": "N/A",
+      "in_place": "Yes"
+    },
+    {
+      "name": "Graph BFS (Breadth-First Search)",
+      "best_time": "O(V + E)",
+      "average_time": "O(V + E)",
+      "worst_time": "O(V + E) (List) / O(V^2) (Matrix)",
+      "space": "O(V)",
+      "stable": "N/A",
+      "in_place": "No"
+    },
+    {
+      "name": "Graph DFS (Depth-First Search)",
+      "best_time": "O(V + E)",
+      "average_time": "O(V + E)",
+      "worst_time": "O(V + E) (List) / O(V^2) (Matrix)",
+      "space": "O(V)",
+      "stable": "N/A",
+      "in_place": "No"
+    },
+    {
+      "name": "Hash Table (Insert / Search)",
+      "best_time": "O(1)",
+      "average_time": "O(1)",
+      "worst_time": "O(n) (All Collide)",
+      "space": "O(m)",
+      "stable": "N/A",
+      "in_place": "No"
+    }
+  ]
+}

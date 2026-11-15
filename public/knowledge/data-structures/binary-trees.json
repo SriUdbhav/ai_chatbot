@@ -1,0 +1,46 @@
+{
+  "topic": "binary-trees",
+  "title": "Binary Trees and Binary Search Trees (BST)",
+  "syllabus_unit": "DS-UNIT-7",
+  "definition": "A Binary Tree is a hierarchical non-linear data structure where each node has at most two children, referred to as the left child and the right child. A Binary Search Tree (BST) is an ordered binary tree where all elements in the left subtree are smaller than the node, and all elements in the right subtree are greater than the node.",
+  "terminology": {
+    "root": "The topmost node in the tree hierarchy with no parent.",
+    "parent": "A node with direct links to child nodes below it.",
+    "child": "A node directly connected to another node when moving away from root.",
+    "leaf": "A terminal node with degree 0 (no children: left == NULL && right == NULL).",
+    "height": "The number of edges on the longest path from the node to a leaf (height of a single node tree is 0, empty tree is -1).",
+    "depth": "The number of edges from the root to the node (depth of root is 0).",
+    "level": "Depth of the node + 1 (root is at Level 1)."
+  },
+  "node_structure": "struct TreeNode {\n    int data;\n    struct TreeNode* left;\n    struct TreeNode* right;\n};",
+  "c_program": "#include <stdio.h>\n#include <stdlib.h>\n\nstruct TreeNode {\n    int data;\n    struct TreeNode* left;\n    struct TreeNode* right;\n};\n\nstruct TreeNode* createNode(int val) {\n    struct TreeNode* n = (struct TreeNode*)malloc(sizeof(struct TreeNode));\n    n->data = val;\n    n->left = NULL;\n    n->right = NULL;\n    return n;\n}\n\nstruct TreeNode* insertBST(struct TreeNode* root, int val) {\n    if (root == NULL) return createNode(val);\n    if (val < root->data) root->left = insertBST(root->left, val);\n    else if (val > root->data) root->right = insertBST(root->right, val);\n    return root;\n}\n\nstruct TreeNode* searchBST(struct TreeNode* root, int key) {\n    if (root == NULL || root->data == key) return root;\n    if (key < root->data) return searchBST(root->left, key);\n    return searchBST(root->right, key);\n}\n\nvoid inorder(struct TreeNode* root) {\n    if (root) {\n        inorder(root->left);\n        printf(\"%d \", root->data);\n        inorder(root->right);\n    }\n}\n\nvoid preorder(struct TreeNode* root) {\n    if (root) {\n        printf(\"%d \", root->data);\n        preorder(root->left);\n        preorder(root->right);\n    }\n}\n\nvoid postorder(struct TreeNode* root) {\n    if (root) {\n        postorder(root->left);\n        postorder(root->right);\n        printf(\"%d \", root->data);\n    }\n}\n\nint treeHeight(struct TreeNode* root) {\n    if (root == NULL) return -1;\n    int lh = treeHeight(root->left);\n    int rh = treeHeight(root->right);\n    return 1 + (lh > rh ? lh : rh);\n}\n\nint countLeaves(struct TreeNode* root) {\n    if (root == NULL) return 0;\n    if (root->left == NULL && root->right == NULL) return 1;\n    return countLeaves(root->left) + countLeaves(root->right);\n}\n\nint main(void) {\n    struct TreeNode* root = NULL;\n    int values[] = {50, 30, 20, 40, 70, 60, 80};\n    for (int i = 0; i < 7; i++) root = insertBST(root, values[i]);\n\n    printf(\"Inorder Traversal:   \"); inorder(root); printf(\"\\n\");\n    printf(\"Preorder Traversal:  \"); preorder(root); printf(\"\\n\");\n    printf(\"Postorder Traversal: \"); postorder(root); printf(\"\\n\");\n    printf(\"Tree Height: %d\\n\", treeHeight(root));\n    printf(\"Leaf Node Count: %d\\n\", countLeaves(root));\n    return 0;\n}",
+  "sample_io": "Output:\nInorder Traversal:   20 30 40 50 60 70 80 \nPreorder Traversal:  50 30 20 40 70 60 80 \nPostorder Traversal: 20 40 30 60 80 70 50 \nTree Height: 2\nLeaf Node Count: 4",
+  "ascii_tree": "Constructed Binary Search Tree (BST):\n            50\n          /    \\\n        30      70\n       /  \\    /  \\\n      20  40  60  80",
+  "traversals_explained": {
+    "inorder": "Left -> Root -> Right. Sequence: 20 -> 30 -> 40 -> 50 -> 60 -> 70 -> 80. (Always sorted in a BST!)",
+    "preorder": "Root -> Left -> Right. Sequence: 50 -> 30 -> 20 -> 40 -> 70 -> 60 -> 80. (Used for copying/serializing trees)",
+    "postorder": "Left -> Right -> Root. Sequence: 20 -> 40 -> 30 -> 60 -> 80 -> 70 -> 50. (Used for tree deletion and bottom-up evaluation)"
+  },
+  "height_and_leaves_explained": "Height is calculated recursively: Height = 1 + max(Height(left), Height(right)) with base case of -1 for NULL. Leaf nodes are counted recursively: if a node has no left child and no right child, it contributes 1; otherwise, sum of leaves in left and right subtrees.",
+  "time_complexity": {
+    "bst_search": "Average: O(log n), Worst: O(n) (Skewed tree)",
+    "bst_insert": "Average: O(log n), Worst: O(n) (Skewed tree)",
+    "traversals": "O(n) (Every node visited once)",
+    "height_and_leaves": "O(n)"
+  },
+  "space_complexity": "O(h) stack memory where h is tree height.",
+  "viva_questions": [
+    {
+      "question": "Which traversal of a Binary Search Tree (BST) produces keys in ascending sorted order?",
+      "answer": "Inorder traversal (Left, Root, Right). Because in a BST, left < root < right, traversing left first, then root, then right visits elements in strictly increasing order."
+    },
+    {
+      "question": "What is the formula for counting leaf nodes in a binary tree?",
+      "answer": "If node is NULL, return 0. If node->left == NULL && node->right == NULL, return 1. Else return countLeaves(left) + countLeaves(right)."
+    },
+    {
+      "question": "What is the height of an empty tree and a single-node tree?",
+      "answer": "By convention, height of an empty tree is -1 (or 0 in 1-based node height conventions), and height of a single-node tree (root only) is 0."
+    }
+  ]
+}

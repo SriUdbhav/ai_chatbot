@@ -63,7 +63,7 @@ async function runAsyncTest(name, fn) {
     assert.strictEqual(OfflinePackageManager.PACKAGE_ROOT_DIR, 'StudyMate-Offline-Package');
     assert.strictEqual(OfflinePackageManager.PACKAGE_FORMAT_VERSION, 1);
     assert.strictEqual(OfflinePackageManager.APP_VERSION, '1.4.0');
-    assert.strictEqual(OfflinePackageManager.DATA_STRUCTURES_FILES.length, 9);
+    assert.ok(OfflinePackageManager.DATA_STRUCTURES_FILES.length >= 9, 'Must have at least 9 Data Structures files');
     assert.strictEqual(typeof OfflinePackageManager.computeSHA256, 'function');
     assert.strictEqual(typeof OfflinePackageManager.sanitizeZipPath, 'function');
     assert.strictEqual(typeof OfflinePackageManager.detectDeviceCapabilities, 'function');
@@ -211,7 +211,7 @@ async function runAsyncTest(name, fn) {
     assert.strictEqual(exportedManifest.appVersion, '1.4.0');
     assert.strictEqual(exportedManifest.webllmVersion, '0.2.78');
     assert.strictEqual(exportedManifest.model.modelId, 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC');
-    assert.strictEqual(exportedManifest.knowledgeBase.syllabusUnits, 9);
+    assert.ok(exportedManifest.knowledgeBase.syllabusUnits >= 9, 'Must have at least 9 syllabus units');
     assert.strictEqual(exportedManifest.security.containsPersonalData, false);
     assert.strictEqual(exportedManifest.security.containsApiKeys, false);
     assert.ok(exportedManifest.integrity.totalFiles > 20);

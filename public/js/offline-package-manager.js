@@ -36,14 +36,17 @@
   const WEBLLM_VERSION = '0.2.78';
 
   const DATA_STRUCTURES_FILES = [
-    'binary-trees.json',
-    'circular-queues.json',
-    'complexity.json',
-    'linked-lists.json',
-    'queues.json',
+    'fundamentals.json',
     'searching.json',
     'sorting.json',
+    'linked-lists.json',
     'stacks.json',
+    'queues.json',
+    'circular-queues.json',
+    'binary-trees.json',
+    'graphs.json',
+    'hashing.json',
+    'complexity.json',
     'viva.json'
   ];
 

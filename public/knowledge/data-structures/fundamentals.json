@@ -1,0 +1,72 @@
+{
+  "topic": "fundamentals",
+  "title": "Data Structures Fundamentals & Memory Management",
+  "syllabus_unit": "DS-UNIT-0",
+  "items": {
+    "introduction": {
+      "name": "Introduction to Data Structures",
+      "definition": "A Data Structure is a specialized format for organizing, processing, retrieving, and storing data in computer memory so that operations can be performed efficiently.",
+      "classification": "Data structures are broadly categorized into Primitive (integers, floats, characters, pointers) and Non-Primitive (Arrays, Linked Lists, Stacks, Queues, Trees, Graphs). Non-primitive structures are further divided into Linear and Non-Linear.",
+      "characteristics": [
+        "Correctness: Retains data integrity across all operations.",
+        "Time Efficiency: Minimizes CPU execution time for insertions, deletions, and lookups.",
+        "Space Efficiency: Minimizes memory overhead and avoids memory fragmentation."
+      ],
+      "c_program": "#include <stdio.h>\n\n// Demonstrating primitive vs user-defined non-primitive structure\nstruct Student {\n    int id;\n    char name[50];\n    float gpa;\n};\n\nint main(void) {\n    // Primitive types\n    int semester = 3;\n    float creditHours = 18.5f;\n\n    // User-defined composite data structure\n    struct Student s1 = {101, \"Alice Smith\", 3.85f};\n\n    printf(\"=== Data Structures: Primitive vs Non-Primitive ===\\n\");\n    printf(\"Primitive: Semester = %d, Credits = %.1f\\n\", semester, creditHours);\n    printf(\"Composite Struct: ID = %d, Name = %s, GPA = %.2f\\n\", s1.id, s1.name, s1.gpa);\n    return 0;\n}",
+      "sample_io": "Output:\n=== Data Structures: Primitive vs Non-Primitive ===\nPrimitive: Semester = 3, Credits = 18.5\nComposite Struct: ID = 101, Name = Alice Smith, GPA = 3.85",
+      "time_complexity": "Direct struct field access: O(1)",
+      "space_complexity": "sizeof(struct Student) bytes contiguous in memory",
+      "viva_questions": [
+        { "q": "What is the difference between an Abstract Data Type (ADT) and a Data Structure?", "a": "An ADT specifies WHAT operations can be performed and what mathematical behaviors are expected (e.g., Stack ADT requires push and pop), while a Data Structure is the concrete implementation in code showing HOW operations are realized in memory." },
+        { "q": "What are linear vs non-linear data structures?", "a": "Linear data structures (Arrays, Linked Lists, Stacks, Queues) arrange elements sequentially where each element has a single predecessor and successor. Non-linear structures (Trees, Graphs) arrange elements hierarchically or interconnectedly where an element can have multiple predecessors or successors." }
+      ]
+    },
+    "linear_vs_non_linear": {
+      "name": "Linear vs Non-Linear Data Structures",
+      "definition": "Linear data structures store elements sequentially in a single level, while Non-Linear data structures store elements in multi-level, hierarchical, or interconnected relationships.",
+      "comparison_table": "| Parameter | Linear Data Structures | Non-Linear Data Structures |\n| :--- | :--- | :--- |\n| **Arrangement** | Sequential / Single-level | Multi-level / Hierarchical / Network |\n| **Traversal** | Single pass can visit all elements | Multiple traversal orders (DFS, BFS, Inorder) |\n| **Memory Allocation** | Mostly contiguous (Arrays) or linear pointers | Tree nodes / Graph adjacency lists |\n| **Examples** | Arrays, Linked Lists, Stacks, Queues | Binary Trees, BST, Heaps, Graphs |\n| **Time Complexity** | Search is O(n) (O(log n) if sorted array) | BST Search is O(log n), Graph traversal O(V+E) |\n| **Applications** | Buffer queues, undo stacks, sequential lists | File systems, hierarchy trees, network routing |",
+      "explanation": "Linear structures are easier to implement and navigate sequentially from start to end. Non-linear structures excel when modeling real-world hierarchical relationships (like folder trees, corporate org charts) or network relationships (like social graphs, city road networks).",
+      "c_program": "#include <stdio.h>\n\n// Demonstrating linear sequence vs branching hierarchy\nint main(void) {\n    // Linear structure: 1D Array\n    int linearArr[4] = {10, 20, 30, 40};\n    printf(\"Linear Traversal: \");\n    for (int i = 0; i < 4; i++) {\n        printf(\"%d \", linearArr[i]);\n    }\n    printf(\"\\n\");\n    return 0;\n}",
+      "sample_io": "Output:\nLinear Traversal: 10 20 30 40",
+      "viva_questions": [
+        { "q": "Give two examples of non-linear data structures.", "a": "Binary Search Trees and Graphs." },
+        { "q": "Can all elements of a tree be traversed in a single linear pass?", "a": "No, non-linear structures require traversal algorithms like Inorder, Preorder, Postorder, or Breadth-First Search (Level-Order) using auxiliary stacks or queues." }
+      ]
+    },
+    "static_vs_dynamic_memory": {
+      "name": "Static vs Dynamic Memory Allocation",
+      "definition": "Static memory allocation allocates a fixed block of memory at compile time in the stack/data segment. Dynamic memory allocation allocates memory at runtime in the heap segment using standard functions (malloc, calloc, realloc, free).",
+      "comparison_table": "| Parameter | Static Memory Allocation | Dynamic Memory Allocation |\n| :--- | :--- | :--- |\n| **Time of Allocation** | Compile time | Run time |\n| **Memory Region** | Stack or Data Segment | Heap Segment |\n| **Size Flexibility** | Fixed, cannot be resized | Resizable using realloc() |\n| **Deallocation** | Automatic when out of scope | Manual via free() (Risk of memory leak) |\n| **Efficiency** | Faster execution | Slight allocation overhead |\n| **Example** | `int arr[100];` | `int *ptr = (int *)malloc(n * sizeof(int));` |",
+      "c_program": "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    int n = 5;\n    // Allocate memory dynamically on Heap\n    int *arr = (int *)malloc(n * sizeof(int));\n    if (arr == NULL) {\n        printf(\"Memory allocation failed!\\n\");\n        return 1;\n    }\n\n    for (int i = 0; i < n; i++) {\n        arr[i] = (i + 1) * 10;\n    }\n\n    printf(\"Dynamically Allocated Array: \");\n    for (int i = 0; i < n; i++) {\n        printf(\"%d \", arr[i]);\n    }\n    printf(\"\\n\");\n\n    // Crucial: Deallocate to prevent memory leak\n    free(arr);\n    arr = NULL; // Prevent dangling pointer\n    printf(\"Memory successfully freed.\\n\");\n    return 0;\n}",
+      "sample_io": "Output:\nDynamically Allocated Array: 10 20 30 40 50\nMemory successfully freed.",
+      "viva_questions": [
+        { "q": "What is a memory leak and how do you prevent it in C?", "a": "A memory leak occurs when dynamically allocated heap memory (via malloc/calloc) is no longer needed but is not released using free(). It is prevented by always pairing every malloc() with free() and setting the pointer to NULL." },
+        { "q": "What is the difference between malloc() and calloc()?", "a": "malloc(size) allocates a single uninitialized block containing garbage values. calloc(num, size) allocates memory for an array of elements and initializes every byte to zero." },
+        { "q": "What is a dangling pointer?", "a": "A dangling pointer is a pointer that points to a memory location that has already been deallocated using free(). Accessing it causes undefined behavior or Segmentation Fault." }
+      ]
+    },
+    "arrays_and_pointers": {
+      "name": "Arrays, Pointers, and Structures in C",
+      "definition": "An array is a collection of homogeneous elements stored at contiguous memory locations. A pointer is a variable that stores the memory address of another variable. A structure is a user-defined composite data type grouping heterogeneous elements.",
+      "explanation": "In C, an array name decays into a pointer to its first element: `arr == &arr[0]`. Pointer arithmetic allows moving through array indices: `*(arr + i) == arr[i]`. In structures, members are accessed via dot `.` on direct variables or arrow `->` on struct pointers.",
+      "c_program": "#include <stdio.h>\n#include <stdlib.h>\n\nstruct Node {\n    int val;\n    struct Node *next;\n};\n\nint main(void) {\n    int arr[] = {10, 20, 30};\n    int *ptr = arr;\n\n    printf(\"Pointer arithmetic on array:\\n\");\n    for (int i = 0; i < 3; i++) {\n        printf(\"*(ptr + %d) = %d at address %p\\n\", i, *(ptr + i), (void *)(ptr + i));\n    }\n\n    // Struct pointer and arrow operator\n    struct Node n1 = {100, NULL};\n    struct Node *nPtr = &n1;\n    printf(\"Struct access via pointer: nPtr->val = %d\\n\", nPtr->val);\n    return 0;\n}",
+      "sample_io": "Output:\nPointer arithmetic on array:\n*(ptr + 0) = 10 at address 0x...\n*(ptr + 1) = 20 at address 0x...\n*(ptr + 2) = 30 at address 0x...\nStruct access via pointer: nPtr->val = 100",
+      "viva_questions": [
+        { "q": "How is a 2D array stored in memory in C?", "a": "In C, 2D arrays are stored in Row-Major order where all elements of row 0 are placed first, followed by row 1, etc. Formula: Address(A[i][j]) = Base + (i * TotalColumns + j) * ElementSize." },
+        { "q": "What does the -> operator do in C?", "a": "The arrow operator `ptr->member` is syntactic shorthand for dereferencing a structure pointer and accessing its member: `(*ptr).member`." }
+      ]
+    },
+    "asymptotic_notations": {
+      "name": "Asymptotic Notations (Big O, Omega, Theta)",
+      "definition": "Asymptotic notations are mathematical tools used to describe the limiting behavior and efficiency of an algorithm's running time or space requirements as the input size n grows towards infinity.",
+      "comparison_table": "| Notation | Formal Definition | Mathematical Meaning | Practical Usage |\n| :--- | :--- | :--- | :--- |\n| **Big O (O)** | f(n) <= c * g(n) for all n >= n0 | Asymptotic **Upper Bound** | Represents worst-case running time guarantee |\n| **Big Omega (Ω)** | f(n) >= c * g(n) for all n >= n0 | Asymptotic **Lower Bound** | Represents best-case minimum execution time |\n| **Big Theta (Θ)** | c1*g(n) <= f(n) <= c2*g(n) | Asymptotic **Tight Bound** | Exact growth rate when upper & lower match |",
+      "growth_hierarchy": "O(1) < O(log n) < O(n) < O(n log n) < O(n^2) < O(n^3) < O(2^n) < O(n!)",
+      "explanation": "Big O gives the worst-case upper bound guarantee — the algorithm will NEVER perform worse than this. Big Omega gives the best-case lower bound — the algorithm will require AT LEAST this many steps. Big Theta gives the tight bound when upper and lower bounds coincide.",
+      "viva_questions": [
+        { "q": "Why is Big O preferred over Big Omega in software engineering?", "a": "Big O provides a safe upper bound guarantee (worst-case scenario), ensuring system limits, SLA deadlines, and memory budgets are never breached." },
+        { "q": "What is the difference between Big O and Big Theta?", "a": "Big O is an upper bound (it can be loose, e.g. an O(n) algorithm is technically also O(n^2)), while Big Theta represents an asymptotically tight bound where upper and lower bounds match." }
+      ]
+    }
+  }
+}
+
