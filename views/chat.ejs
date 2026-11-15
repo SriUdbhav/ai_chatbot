@@ -261,6 +261,12 @@
             <span class="engine-indicator-text" id="engineIndicatorText">Gemini AI</span>
           </button>
 
+          <!-- Dedicated Examination Offline Mode Toggle Button -->
+          <button type="button" class="exam-mode-toggle-btn" id="examModeToggleBtn" title="Toggle Dedicated Examination Offline Mode" aria-pressed="false">
+            <span class="exam-mode-icon">🎓</span>
+            <span class="exam-mode-label">Exam Mode</span>
+          </button>
+
           <!-- Compact Transparency Controller Button & Popover -->
           <div class="transparency-ctrl-wrapper" id="transparencyCtrlWrapper">
             <button type="button" class="icon-btn transparency-toggle-btn" id="topbarTransparencyBtn" title="Interface Transparency & Visual Accessibility (20% – 100%)" aria-label="Adjust surface transparency" aria-haspopup="true" aria-expanded="false">
@@ -392,6 +398,7 @@
             <span class="mode-badge-label">Study Mode:</span>
             <select class="mode-select" id="studyModeSelect" aria-label="Select study mode">
               <option value="standard" selected>🎓 Standard Academic</option>
+              <option value="data_structures">🌳 Data Structures Exam Mode</option>
               <option value="simple">💡 Simple Explanation</option>
               <option value="step_by_step">🪜 Step-by-Step</option>
               <option value="exam_prep">📋 Exam Prep</option>
@@ -566,6 +573,29 @@
               </button>
               <button class="suggestion-chip" data-prompt="What caused the Industrial Revolution and what were its primary societal and technological impacts?">
                 Causes of the Industrial Revolution
+              </button>
+            </div>
+
+            <!-- Data Structures Exam Prep Group (100% Offline Ready) -->
+            <div class="suggestion-group ds-suggestion-group">
+              <div class="suggestion-group-header">
+                <span class="suggestion-group-icon" aria-hidden="true">🌳</span>
+                <h3 class="suggestion-group-title">Data Structures (Offline Exam Prep)</h3>
+              </div>
+              <button class="suggestion-chip" data-prompt="Explain Binary Search with algorithm, complete C program, step-by-step dry run, time complexity, and college viva questions.">
+                Binary Search (C Code &amp; Dry Run)
+              </button>
+              <button class="suggestion-chip" data-prompt="Explain Quick Sort partitioning with Lomuto scheme, complete C implementation, dry run trace, and worst-case recurrence.">
+                Quick Sort Partitioning &amp; Analysis
+              </button>
+              <button class="suggestion-chip" data-prompt="Write a complete C program for Singly Linked List insertion and deletion with node memory diagram.">
+                Singly Linked List in C
+              </button>
+              <button class="suggestion-chip" data-prompt="Explain Circular Queue implementation using arrays and modulo arithmetic with wrap-around full/empty conditions.">
+                Circular Queue (Modulo Arithmetic)
+              </button>
+              <button class="suggestion-chip" data-prompt="What is a Binary Search Tree? Show BST node struct, insertion, search, and inorder traversal in C.">
+                Binary Search Tree (BST) &amp; Traversals
               </button>
             </div>
 
@@ -822,6 +852,39 @@
             <button type="button" class="subject-tag" data-topic="Calculus and Differential Equations">#Calculus</button>
             <button type="button" class="subject-tag" data-topic="Computer Networks and Protocols">#Networks</button>
             <button type="button" class="subject-tag" data-topic="Machine Learning Fundamentals">#MachineLearning</button>
+          </div>
+        </div>
+
+        <!-- Data Structures Syllabus & Exam Readiness (Zero-Internet Repository) -->
+        <div class="panel-section" id="panelDsSyllabusSection">
+          <div class="section-title-row">
+            <h4 class="panel-section-title">DS Exam Syllabus (Offline)</h4>
+            <span class="card-pill" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 600;">100% Precached</span>
+          </div>
+          <p style="font-size: 0.75rem; color: var(--text-muted, #64748b); margin-bottom: 0.5rem; line-height: 1.4;">
+            7 core syllabus units complete with algorithms, C code, dry runs, Big-O, and viva questions.
+          </p>
+          <div class="syllabus-tracker-grid" id="syllabusTrackerGrid">
+            <button type="button" class="syllabus-pill ready" data-topic="searching" title="Searching: Linear & Binary Search in C"><span>🔍</span> Searching</button>
+            <button type="button" class="syllabus-pill ready" data-topic="sorting" title="Sorting: Selection, Bubble, Merge & Quick Sort"><span>🔄</span> Sorting</button>
+            <button type="button" class="syllabus-pill ready" data-topic="linked_list" title="Linked Lists: Singly linked list with insert/delete"><span>🔗</span> Linked Lists</button>
+            <button type="button" class="syllabus-pill ready" data-topic="stack" title="Stacks: Array stack LIFO, push/pop/peek"><span>🥞</span> Stacks</button>
+            <button type="button" class="syllabus-pill ready" data-topic="queue" title="Linear Queues: FIFO, front/rear"><span>🚶</span> Queues</button>
+            <button type="button" class="syllabus-pill ready" data-topic="circular_queue" title="Circular Queues: Modulo arithmetic, wrap-around"><span>⭕</span> Circular Queues</button>
+            <button type="button" class="syllabus-pill ready" data-topic="binary_tree" title="Binary Search Trees: Node struct, insert, search, traversals"><span>🌳</span> Binary Trees</button>
+          </div>
+
+          <!-- Quick Exam Action Tools -->
+          <div class="ds-quick-tools" style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.75rem;">
+            <button type="button" class="btn-secondary-sm" id="quickVivaBtn" style="justify-content: flex-start; text-align: left; padding: 7px 10px; width: 100%;">
+              <span>🎙️</span> <span><strong>Quick Viva Practice:</strong> College Exam Questions</span>
+            </button>
+            <button type="button" class="btn-secondary-sm" id="quickExplainCodeBtn" style="justify-content: flex-start; text-align: left; padding: 7px 10px; width: 100%;">
+              <span>💻</span> <span><strong>Code Explainer:</strong> Step-by-Step Logic Breakdown</span>
+            </button>
+            <button type="button" class="btn-secondary-sm" id="quickDryRunBtn" style="justify-content: flex-start; text-align: left; padding: 7px 10px; width: 100%;">
+              <span>🪜</span> <span><strong>Algorithm Dry Run:</strong> Iteration &amp; Variable Trace</span>
+            </button>
           </div>
         </div>
 
@@ -1574,13 +1637,53 @@
           <div class="setting-item">
             <div class="setting-info">
               <span class="setting-name">AI Engine Routing</span>
-              <span class="setting-desc">Auto uses Gemini when online and seamlessly falls back to Local AI offline.</span>
+              <span class="setting-desc">Auto uses Gemini when online and seamlessly falls back through on-device models to the Offline DS Assistant.</span>
             </div>
             <select class="settings-select" id="enginePrefSelect" aria-label="Select AI engine routing">
-              <option value="auto" selected>Auto (Gemini online, Local AI offline)</option>
-              <option value="local">Local AI (Always On-Device)</option>
+              <option value="auto" selected>Auto (Gemini online, Local AI / Offline DS Assistant)</option>
+              <option value="offline_knowledge">Offline DS Knowledge Assistant (Zero Download, Instant)</option>
+              <option value="local">Local AI (WebLLM / On-Device Only)</option>
               <option value="gemini">Gemini AI (Cloud Only)</option>
             </select>
+          </div>
+
+          <!-- Offline Intelligence & Local AI Diagnostics Inspector (Part 1) -->
+          <div class="setting-item offline-intelligence-inspector" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <span class="setting-name" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.95rem;">
+                  <span>🔍</span> Automatic Local AI Availability Diagnostics
+                </span>
+                <span class="setting-desc">Auto-probes WebLLM model, WebGPU, Chrome Prompt API, Local AI service &amp; Offline DS Assistant.</span>
+              </div>
+              <span class="status-badge-inline" id="offlineIntelligenceStatusBadge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Scanning...</span>
+            </div>
+
+            <!-- Diagnostics 4-Card Multi-Engine Matrix -->
+            <div class="intelligence-matrix-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; font-size: 0.8rem;">
+              <div class="intel-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; display: flex; justify-content: space-between;"><span>1. WebLLM (WebGPU)</span> <span id="intelCheckWebLLMBadge" class="badge-subtle">Checking</span></div>
+                <div id="intelCheckWebLLMDesc" style="color: var(--text-muted, #64748b); font-size: 0.75rem; margin-top: 2px;">Probing WebGPU &amp; model cache</div>
+              </div>
+              <div class="intel-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; display: flex; justify-content: space-between;"><span>2. Chrome Built-in AI</span> <span id="intelCheckChromeBadge" class="badge-subtle">Checking</span></div>
+                <div id="intelCheckChromeDesc" style="color: var(--text-muted, #64748b); font-size: 0.75rem; margin-top: 2px;">Probing window.ai LanguageModel</div>
+              </div>
+              <div class="intel-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; display: flex; justify-content: space-between;"><span>3. Local AI Service</span> <span id="intelCheckOllamaBadge" class="badge-subtle">Checking</span></div>
+                <div id="intelCheckOllamaDesc" style="color: var(--text-muted, #64748b); font-size: 0.75rem; margin-top: 2px;">Safe endpoint probe (1.5s timeout)</div>
+              </div>
+              <div class="intel-check-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; display: flex; justify-content: space-between;"><span>4. Offline DS Assistant</span> <span id="intelCheckKnowledgeBadge" class="badge-subtle" style="color: #10b981;">Ready ✓</span></div>
+                <div id="intelCheckKnowledgeDesc" style="color: var(--text-muted, #64748b); font-size: 0.75rem; margin-top: 2px;">7 syllabus units precached in PWA</div>
+              </div>
+            </div>
+
+            <!-- Active Resolved Route Status Pill -->
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; padding: 0.4rem 0.6rem; background: rgba(0,0,0,0.04); border-radius: 6px;">
+              <span>Active Resolved Route: <strong id="activeResolvedEngineName" style="color: var(--primary, #4f46e5);">Online Gemini</strong></span>
+              <button type="button" class="btn-secondary-sm" id="rescanIntelligenceBtn" style="padding: 3px 8px; font-size: 0.75rem;">Rescan AI</button>
+            </div>
           </div>
 
           <!-- WebGPU Compatibility -->
@@ -1651,6 +1754,19 @@
               <span class="setting-desc" id="storagePersistenceDesc">Protects downloaded AI models against automatic browser eviction.</span>
             </div>
             <span class="status-badge-inline status-online" id="storagePersistenceBadge">Checking...</span>
+          </div>
+
+          <!-- Dedicated Examination Offline Mode Toggle Row -->
+          <div class="setting-item" id="settingsExamModeRow">
+            <div class="setting-info">
+              <span class="setting-name" style="display: flex; align-items: center; gap: 0.4rem;">
+                <span>🎓</span> Dedicated Examination Mode
+              </span>
+              <span class="setting-desc">Enforces 100% on-device local WebLLM execution. Bypasses all Gemini API calls and cloud requests.</span>
+            </div>
+            <button type="button" class="btn-secondary-sm" id="settingsExamModeToggleBtn">
+              <span id="settingsExamModeIcon">🔒</span> <span id="settingsExamModeLabel">Enable Exam Mode</span>
+            </button>
           </div>
 
           <!-- Pre-Exam Zero-Internet Readiness Checker -->
@@ -1734,6 +1850,94 @@
             </select>
           </div>
         </div>
+
+        <!-- ── OFFLINE PACKAGE MANAGER (Export & Import System) ── -->
+        <div class="settings-card-group" id="offlinePackageManagerGroup">
+          <div class="settings-group-header">
+            <div class="settings-group-title">
+              <span class="settings-icon">📦</span>
+              <div>
+                <h4 class="settings-group-heading">Offline Package Manager (Export &amp; Import)</h4>
+                <p class="settings-group-sub">Portable, zero-internet offline packages containing model weights, Data Structures syllabus, and WebLLM runtime.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Device & Mobile Environment Compatibility Card -->
+          <div class="setting-item" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <span class="setting-name" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.95rem;">
+                  <span id="pkgDeviceIcon">💻</span> Device Hardware &amp; Compatibility
+                </span>
+                <span class="setting-desc" id="pkgDeviceDesc">Evaluating platform, memory, and WebGPU capabilities...</span>
+              </div>
+              <span class="status-badge-inline" id="pkgDeviceBadge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Detecting...</span>
+            </div>
+
+            <!-- Mobile Safety Alert Banner (shown when mobile / low memory is detected) -->
+            <div id="pkgMobileAlertBanner" style="display: none; padding: 0.6rem 0.8rem; border-radius: 6px; font-size: 0.8rem; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); color: var(--app-text-primary);">
+              <div style="font-weight: 600; color: #d97706; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 2px;">
+                <span>📱</span> Mobile &amp; Android Device Optimization
+              </div>
+              <div id="pkgMobileAlertMessage" style="font-size: 0.76rem; line-height: 1.4; color: var(--text-muted, #64748b);">
+                Mobile browser detected. Qwen2.5-Coder 0.5B (~390 MB) is recommended to avoid mobile OS memory terminations. Keep this tab in foreground during export/import.
+              </div>
+            </div>
+
+            <!-- Package Configuration Grid -->
+            <div class="package-meta-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; font-size: 0.8rem;">
+              <div class="pkg-meta-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; color: var(--text-muted, #64748b);">Selected Model</div>
+                <div id="pkgMetaModelName" style="font-weight: 600; margin-top: 2px;">Qwen2.5-Coder 1.5B</div>
+              </div>
+              <div class="pkg-meta-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; color: var(--text-muted, #64748b);">Package Format</div>
+                <div style="font-weight: 600; margin-top: 2px;">StudyMate Archive v1.0</div>
+              </div>
+              <div class="pkg-meta-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; color: var(--text-muted, #64748b);">DS Knowledge Base</div>
+                <div style="font-weight: 600; margin-top: 2px; color: #10b981;">9 Syllabus Units Included</div>
+              </div>
+              <div class="pkg-meta-card" style="padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-subtle, rgba(0,0,0,0.08));">
+                <div style="font-weight: 600; color: var(--text-muted, #64748b);">Integrity Protection</div>
+                <div style="font-weight: 600; margin-top: 2px; color: #4f46e5;">SHA-256 Verified</div>
+              </div>
+            </div>
+
+            <!-- Export / Import Progress Bar -->
+            <div class="local-progress-wrap" id="packageProgressWrap" hidden>
+              <div class="local-progress-bar">
+                <div class="local-progress-fill" id="packageProgressFill" style="width: 0%;"></div>
+              </div>
+              <div class="local-progress-meta">
+                <span class="local-progress-text" id="packageProgressPercent">0%</span>
+                <span class="local-progress-info" id="packageProgressText">Preparing package...</span>
+              </div>
+            </div>
+
+            <!-- Package Diagnostics & Output Log Display -->
+            <div id="packageInfoDisplay" style="display: none; padding: 0.65rem 0.85rem; border-radius: 8px; font-size: 0.8rem; background: rgba(0,0,0,0.05); border: 1px solid var(--border-subtle, rgba(0,0,0,0.1)); line-height: 1.45; max-height: 200px; overflow-y: auto;">
+            </div>
+
+            <!-- Actions Row -->
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
+              <input type="file" id="offlinePackageFileInput" accept=".zip" style="display: none;" aria-label="Select Offline Package ZIP">
+              <button type="button" class="btn-primary-sm" id="exportPackageBtn">
+                <span>📦</span> Export Complete Offline Package
+              </button>
+              <button type="button" class="btn-secondary-sm" id="importPackageBtn">
+                <span>📥</span> Import Offline Package (.zip)
+              </button>
+              <button type="button" class="btn-secondary-sm" id="verifyPackageBtn">
+                <span>🔍</span> Verify Package
+              </button>
+              <button type="button" class="btn-secondary-sm" id="comprehensiveReadinessBtn">
+                <span>⚡</span> 9-Step Offline Readiness Test
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="modal-actions">
@@ -1768,6 +1972,9 @@
 
   <!-- Application Logic -->
   <script src="/js/jszip.min.js"></script>
+  <script src="/js/ds-knowledge-engine.js"></script>
+  <script src="/js/local-ai-detector.js"></script>
+  <script src="/js/offline-package-manager.js"></script>
   <script src="/js/chat.js"></script>
 
 </body>

@@ -390,6 +390,23 @@ const localAiDiagnosticTitle = document.getElementById('localAiDiagnosticTitle')
 const localAiDiagnosticMessage = document.getElementById('localAiDiagnosticMessage');
 const localAiDiagnosticDetails = document.getElementById('localAiDiagnosticDetails');
 
+// Offline Intelligence & DS Syllabus References (Part 1 & Part 6)
+const offlineIntelligenceStatusBadge = document.getElementById('offlineIntelligenceStatusBadge');
+const intelCheckWebLLMBadge = document.getElementById('intelCheckWebLLMBadge');
+const intelCheckWebLLMDesc = document.getElementById('intelCheckWebLLMDesc');
+const intelCheckChromeBadge = document.getElementById('intelCheckChromeBadge');
+const intelCheckChromeDesc = document.getElementById('intelCheckChromeDesc');
+const intelCheckOllamaBadge = document.getElementById('intelCheckOllamaBadge');
+const intelCheckOllamaDesc = document.getElementById('intelCheckOllamaDesc');
+const intelCheckKnowledgeBadge = document.getElementById('intelCheckKnowledgeBadge');
+const intelCheckKnowledgeDesc = document.getElementById('intelCheckKnowledgeDesc');
+const activeResolvedEngineName = document.getElementById('activeResolvedEngineName');
+const rescanIntelligenceBtn = document.getElementById('rescanIntelligenceBtn');
+const syllabusTrackerGrid = document.getElementById('syllabusTrackerGrid');
+const quickVivaBtn = document.getElementById('quickVivaBtn');
+const quickExplainCodeBtn = document.getElementById('quickExplainCodeBtn');
+const quickDryRunBtn = document.getElementById('quickDryRunBtn');
+
 function showLocalAiDiagnostic(diag) {
   if (!localAiDiagnosticBox) return;
   localAiDiagnosticBox.style.display = 'block';
@@ -425,6 +442,12 @@ const examTestProgressLog = document.getElementById('examTestProgressLog');
 const testOfflineModeBtn = document.getElementById('testOfflineModeBtn');
 const grantStoragePersistBtn = document.getElementById('grantStoragePersistBtn');
 
+// Dedicated Examination Mode References
+const examModeToggleBtn = document.getElementById('examModeToggleBtn');
+const settingsExamModeToggleBtn = document.getElementById('settingsExamModeToggleBtn');
+const settingsExamModeIcon = document.getElementById('settingsExamModeIcon');
+const settingsExamModeLabel = document.getElementById('settingsExamModeLabel');
+
 // Interface Appearance & Accessibility References
 const surfaceOpacitySlider = document.getElementById('surfaceOpacitySlider');
 const surfaceOpacityVal = document.getElementById('surfaceOpacityVal');
@@ -441,6 +464,65 @@ async function getLocalAI() {
     }
   }
   return localAiModule;
+}
+
+function updateExamModeUI(active) {
+  if (examModeToggleBtn) {
+    examModeToggleBtn.classList.toggle('active', active);
+    examModeToggleBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    const label = examModeToggleBtn.querySelector('.exam-mode-label');
+    if (label) label.textContent = active ? 'Exam Mode (ON)' : 'Exam Mode';
+  }
+
+  if (settingsExamModeToggleBtn) {
+    if (settingsExamModeLabel) {
+      settingsExamModeLabel.textContent = active ? 'Disable Exam Mode' : 'Enable Exam Mode';
+    }
+    if (settingsExamModeIcon) {
+      settingsExamModeIcon.textContent = active ? '🔓' : '🔒';
+    }
+    settingsExamModeToggleBtn.className = active ? 'btn-danger-sm' : 'btn-secondary-sm';
+  }
+}
+
+async function toggleExamMode() {
+  const localAi = await getLocalAI();
+  if (!localAi) return;
+  const currentActive = localAi.getExamModeActive();
+
+  if (!currentActive) {
+    // Attempting to activate Exam Mode
+    const modelId = localAi.getSelectedModelId();
+    const verification = await localAi.verifyModelInstallation(modelId);
+    if (!verification.installed) {
+      alert(
+        `🎓 Cannot activate Examination Offline Mode\n\n` +
+        `The local AI model (${verification.modelInfo?.name || modelId}) is not installed on this device.\n\n` +
+        `Examination Mode strictly enforces 100% on-device local WebLLM execution with zero internet or cloud calls.\n\n` +
+        `Please connect to the internet, open Settings (⚙️), and click "Install Model (One-Time Setup)" first.`
+      );
+      if (settingsModal) {
+        settingsModal.removeAttribute('hidden');
+        initLocalAiSettings();
+        const group = document.getElementById('localAiSettingsGroup');
+        if (group) group.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    localAi.setExamModeActive(true);
+    updateExamModeUI(true);
+    await updateEngineIndicator();
+    showToast('🎓 Examination Mode ACTIVE: 100% on-device WebLLM locked. Cloud APIs disabled.', 'success');
+
+    // Pre-warm engine in background
+    localAi.ensureEngineReady(modelId).catch(e => console.warn('[ExamMode] Background engine pre-warm:', e));
+  } else {
+    localAi.setExamModeActive(false);
+    updateExamModeUI(false);
+    await updateEngineIndicator();
+    showToast('Examination Mode deactivated. Auto engine routing restored.', 'info');
+  }
 }
 
 async function updateEngineIndicator(forcedState, customLabel) {
@@ -463,8 +545,19 @@ async function updateEngineIndicator(forcedState, customLabel) {
   }
 
   const localAi = await getLocalAI();
-  const pref = localAi ? localAi.getEnginePreference() : 'auto';
-  const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+  if (!localAi) return;
+
+  const startupStatus = typeof localAi.getStartupStatus === 'function'
+    ? await localAi.getStartupStatus()
+    : null;
+
+  if (startupStatus && startupStatus.examModeActive) {
+    engineIndicatorDot.className = 'engine-indicator-dot dot-emerald';
+    engineIndicatorText.textContent = startupStatus.badgeLabel; // 'Exam Offline Ready'
+    return;
+  }
+
+  const pref = localAi.getEnginePreference();
 
   if (pref === 'local') {
     engineIndicatorDot.className = 'engine-indicator-dot dot-purple';
@@ -473,9 +566,9 @@ async function updateEngineIndicator(forcedState, customLabel) {
   }
 
   if (pref === 'gemini') {
-    if (isOnline) {
+    if (startupStatus ? startupStatus.isOnline : (typeof navigator !== 'undefined' && navigator.onLine)) {
       engineIndicatorDot.className = 'engine-indicator-dot dot-green';
-      engineIndicatorText.textContent = 'Gemini AI';
+      engineIndicatorText.textContent = 'Online Gemini Ready';
     } else {
       engineIndicatorDot.className = 'engine-indicator-dot dot-amber';
       engineIndicatorText.textContent = 'Gemini (Offline)';
@@ -484,18 +577,17 @@ async function updateEngineIndicator(forcedState, customLabel) {
   }
 
   // Auto mode:
-  if (isOnline) {
-    engineIndicatorDot.className = 'engine-indicator-dot dot-green';
-    engineIndicatorText.textContent = 'Gemini AI';
+  if (startupStatus) {
+    engineIndicatorDot.className = `engine-indicator-dot ${startupStatus.dotClass}`;
+    engineIndicatorText.textContent = startupStatus.badgeLabel;
   } else {
-    const modelId = localAi ? localAi.getSelectedModelId() : null;
-    const isCached = localAi ? await localAi.isModelCached(modelId) : false;
-    if (isCached) {
-      engineIndicatorDot.className = 'engine-indicator-dot dot-purple';
-      engineIndicatorText.textContent = 'Local AI (Offline)';
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+    if (isOnline) {
+      engineIndicatorDot.className = 'engine-indicator-dot dot-green';
+      engineIndicatorText.textContent = 'Online Gemini Ready';
     } else {
-      engineIndicatorDot.className = 'engine-indicator-dot dot-amber';
-      engineIndicatorText.textContent = 'Offline (Setup AI)';
+      engineIndicatorDot.className = 'engine-indicator-dot dot-purple';
+      engineIndicatorText.textContent = 'Offline WebLLM Ready';
     }
   }
 }
@@ -1691,6 +1783,25 @@ function renderImageMessageHtml(msg) {
   `;
 }
 
+function formatEngineBadge(msg) {
+  if (!msg || msg.role === 'user') return '';
+  const engine = msg.engine || (msg.isLocalAi ? 'webllm' : 'gemini');
+  switch (engine) {
+    case 'gemini':
+      return `<span class="msg-engine-badge badge-gemini" title="Generated by Online Google Gemini Cloud API">✨ Online Gemini</span>`;
+    case 'webllm':
+      return `<span class="msg-engine-badge badge-webllm" title="Generated by On-Device WebLLM (WebGPU)">⚡ Local WebLLM</span>`;
+    case 'chrome_builtin':
+      return `<span class="msg-engine-badge badge-chrome" title="Generated by Chrome On-Device Gemini Nano / Prompt API">🌐 Chrome Built-in AI</span>`;
+    case 'local_service':
+      return `<span class="msg-engine-badge badge-local-service" title="Generated by Local AI Service (Ollama)">🖥️ Local AI Service</span>`;
+    case 'offline_knowledge':
+      return `<span class="msg-engine-badge badge-knowledge" title="Structured Academic Repository (Not a generative LLM)">📚 Offline Knowledge Assistant</span>`;
+    default:
+      return `<span class="msg-engine-badge badge-gemini">✨ Online Gemini</span>`;
+  }
+}
+
 function buildMessageEl(msg) {
   const row = document.createElement('div');
   row.className = 'msg-row';
@@ -1699,6 +1810,7 @@ function buildMessageEl(msg) {
   const isUser = msg.role === 'user';
   const bubbleClass = isUser ? 'user-bubble' : (msg.isError ? 'ai-bubble error-bubble' : 'ai-bubble');
   const senderLabel = isUser ? 'You' : 'StudyMate AI';
+  const engineBadgeHtml = !isUser ? formatEngineBadge(msg) : '';
 
   let contentHtml = '';
   if (isUser) {
@@ -1782,6 +1894,7 @@ function buildMessageEl(msg) {
         ${isUser ? 'You' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>'}
       </div>
       <span class="msg-sender">${escapeHtml(senderLabel)}</span>
+      ${engineBadgeHtml}
       <span class="msg-time">${msg.time || formatTime(msg.timestamp)}</span>
     </div>
     <div class="msg-bubble ${bubbleClass}">${contentHtml}</div>
@@ -3505,54 +3618,199 @@ async function submitMessage(text) {
     .slice(-12)
     .map(m => ({ role: m.role === 'assistant' ? 'model' : m.role, content: m.content }));
 
-  // ── Engine Resolution (Gemini vs Local AI) ─────────────────────────────────
+  // ── 5-Tier Response Routing Hierarchy ───────────────────────────────────────
+  // Priority: (1) Online Gemini, (2) WebLLM, (3) Chrome built-in AI, (4) Local AI service, (5) Offline Data Structures Knowledge Assistant
   const localAi = await getLocalAI();
   const enginePref = localAi ? localAi.getEnginePreference() : 'auto';
+  const examModeActive = localAi && typeof localAi.getExamModeActive === 'function' ? localAi.getExamModeActive() : false;
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
   let useLocalAi = false;
-  if (enginePref === 'local') {
+  if (examModeActive) {
+    useLocalAi = true;
+  } else if (enginePref === 'local') {
     useLocalAi = true;
   } else if (enginePref === 'auto') {
     useLocalAi = !isOnline;
-  } else if (enginePref === 'gemini') {
-    useLocalAi = false;
   }
 
-  // ── Branch A: Execute with On-Device Local AI (WebLLM via WebGPU) ───────────
-  if (useLocalAi && localAi) {
-    const gpuCheck = await localAi.checkWebGPUSupport();
-    if (!gpuCheck.supported) {
+  const isDSQuery = window.DSKnowledgeEngine && typeof window.DSKnowledgeEngine.classifyDSQuery === 'function'
+    ? window.DSKnowledgeEngine.classifyDSQuery(promptText).isDSQuery
+    : false;
+
+  // Helper 5: Offline Knowledge Assistant
+  async function runOfflineKnowledgeAssistant() {
+    showLoading();
+    state.isWaiting = true;
+    updateComposerButtons();
+    updateEngineIndicator('local', 'Offline DS Assistant');
+
+    const aiMsgId = generateId('msg');
+    try {
+      const res = window.DSKnowledgeEngine && typeof window.DSKnowledgeEngine.queryKnowledgeBase === 'function'
+        ? window.DSKnowledgeEngine.queryKnowledgeBase(promptText, history)
+        : null;
+
+      removeLoading();
+      let content = '';
+      if (res && res.success && res.content) {
+        content = res.content;
+      } else {
+        content = `### 📚 Offline Data Structures Knowledge Assistant\n\n` +
+          `I am operating entirely offline from the pre-cached college syllabus repository.\n\n` +
+          `**Available Syllabus Units (Zero Internet Required):**\n` +
+          `1. **Searching Algorithms**: Linear Search, Binary Search in C, step-by-step dry runs, recursive vs iterative.\n` +
+          `2. **Sorting Algorithms**: Selection Sort, Bubble Sort, Merge Sort, Quick Sort (partitioning, complexity, stability).\n` +
+          `3. **Linked Lists**: Singly Linked List (struct node, malloc, insert, delete, display, diagrams).\n` +
+          `4. **Stacks**: Array-based Stack (LIFO, push/pop/peek/display, overflow/underflow, dry run trace).\n` +
+          `5. **Queues**: Linear Queue with array (FIFO, front/rear pointers, false overflow limitation).\n` +
+          `6. **Circular Queues**: Modulo arithmetic \`(rear + 1) % MAX\`, wrap-around conditions, complete C code.\n` +
+          `7. **Binary Trees**: Binary Search Tree (BST insertion, search, inorder/preorder/postorder traversals).\n\n` +
+          `*Try asking any question about algorithms, C programs, dry runs, Big-O complexity, or viva questions.*`;
+      }
+
       appendMessageToActive({
-        id: generateId('msg'),
+        id: aiMsgId,
         role: 'model',
-        content: `⚠️ **WebGPU Unsupported:** ${gpuCheck.reason}\n\nLocal AI requires WebGPU hardware acceleration. When online, you can use Gemini AI or check Chrome flags (\`chrome://flags/#enable-unsafe-webgpu\`).`,
+        content,
         timestamp: Date.now(),
         time: formatTime(),
+        engine: 'offline_knowledge',
+        isError: false
+      });
+      return true;
+    } catch (err) {
+      removeLoading();
+      appendMessageToActive({
+        id: aiMsgId,
+        role: 'model',
+        content: `⚠️ Offline Knowledge Assistant Error: ${err.message}`,
+        timestamp: Date.now(),
+        time: formatTime(),
+        engine: 'offline_knowledge',
         isError: true
       });
+      return false;
+    } finally {
       state.isWaiting = false;
       updateComposerButtons();
-      return;
+      updateEngineIndicator();
+      saveStoredConversations();
+      renderConvoList();
     }
+  }
 
+  // Helper 4: Local AI Service (Ollama)
+  async function runLocalAIService() {
+    if (!window.LocalAIDetector || typeof window.LocalAIDetector.checkLocalAIService !== 'function') return false;
+    const probe = await window.LocalAIDetector.checkLocalAIService();
+    if (!probe.available) return false;
+
+    showLoading();
+    state.isWaiting = true;
+    state.isStreaming = true;
+    updateComposerButtons();
+    updateEngineIndicator('running', 'Local AI Service...');
+
+    const aiMsgId = generateId('msg');
+    let firstToken = true;
+    try {
+      const fullReply = await window.LocalAIDetector.generateLocalServiceResponse({
+        prompt: promptText,
+        history,
+        mode: requestedMode,
+        endpoint: probe.endpoint,
+        onChunk: (delta, accumulated) => {
+          if (firstToken) {
+            firstToken = false;
+            removeLoading();
+            appendMessageToActive({
+              id: aiMsgId,
+              role: 'model',
+              content: accumulated,
+              timestamp: Date.now(),
+              time: formatTime(),
+              engine: 'local_service',
+              isError: false
+            });
+            updateEngineIndicator('local', 'Local AI Service');
+          } else {
+            updateStreamingMessage(aiMsgId, accumulated);
+          }
+        }
+      });
+      finalizeStreamedMessage(aiMsgId, fullReply);
+      return true;
+    } catch (_) {
+      removeLoading();
+      return false;
+    } finally {
+      state.isWaiting = false;
+      state.isStreaming = false;
+      updateComposerButtons();
+      updateEngineIndicator();
+    }
+  }
+
+  // Helper 3: Chrome Built-in AI
+  async function runChromeBuiltInAI() {
+    if (!window.LocalAIDetector || typeof window.LocalAIDetector.checkChromeBuiltInAI !== 'function') return false;
+    const probe = await window.LocalAIDetector.checkChromeBuiltInAI();
+    if (!probe.available) return false;
+
+    showLoading();
+    state.isWaiting = true;
+    state.isStreaming = true;
+    updateComposerButtons();
+    updateEngineIndicator('running', 'Chrome Built-in AI...');
+
+    const aiMsgId = generateId('msg');
+    let firstToken = true;
+    try {
+      const fullReply = await window.LocalAIDetector.generateChromeBuiltInResponse({
+        prompt: promptText,
+        history,
+        mode: requestedMode,
+        onChunk: (delta, accumulated) => {
+          if (firstToken) {
+            firstToken = false;
+            removeLoading();
+            appendMessageToActive({
+              id: aiMsgId,
+              role: 'model',
+              content: accumulated,
+              timestamp: Date.now(),
+              time: formatTime(),
+              engine: 'chrome_builtin',
+              isError: false
+            });
+            updateEngineIndicator('local', 'Chrome Built-in AI');
+          } else {
+            updateStreamingMessage(aiMsgId, accumulated);
+          }
+        }
+      });
+      finalizeStreamedMessage(aiMsgId, fullReply);
+      return true;
+    } catch (_) {
+      removeLoading();
+      return false;
+    } finally {
+      state.isWaiting = false;
+      state.isStreaming = false;
+      updateComposerButtons();
+      updateEngineIndicator();
+    }
+  }
+
+  // Helper 2: WebLLM
+  async function runWebLLM() {
+    if (!localAi) return false;
+    const gpuCheck = await localAi.checkWebGPUSupport();
+    if (!gpuCheck.supported) return false;
     const modelId = localAi.getSelectedModelId();
     const isCached = await localAi.isModelCached(modelId);
-
-    if (!isCached && !isOnline) {
-      appendMessageToActive({
-        id: generateId('msg'),
-        role: 'model',
-        content: `⚠️ **Offline Model Setup Required**\n\nThe local AI model (**${modelId}**) has not been downloaded to this browser yet.\n\nTo enable generative AI responses offline:\n1. Connect to the internet once.\n2. Open **Settings** (⚙️) from the topbar or sidebar.\n3. Click **Download Model** under **Offline Generative AI** (~390 MB to ~980 MB).\n\nOnce cached in browser storage, StudyMate AI will generate full answers anytime with zero internet connection!`,
-        timestamp: Date.now(),
-        time: formatTime(),
-        isError: true
-      });
-      showToast('Local model not cached. Open Settings while online to download it.', 'warn');
-      state.isWaiting = false;
-      updateComposerButtons();
-      return;
-    }
+    if (!isCached) return false;
 
     showLoading();
     state.isWaiting = true;
@@ -3593,6 +3851,7 @@ async function submitMessage(text) {
               content: accumulated,
               timestamp: Date.now(),
               time: formatTime(),
+              engine: 'webllm',
               isError: false
             });
             updateEngineIndicator('local', 'Local AI (WebGPU)');
@@ -3603,18 +3862,10 @@ async function submitMessage(text) {
       });
 
       finalizeStreamedMessage(aiMsgId, fullReply);
-    } catch (localErr) {
-      removeLoading();
-      if (firstToken) {
-        appendMessageToActive({
-          id: aiMsgId,
-          role: 'model',
-          content: `⚠️ **Local AI Inference Error:** ${localErr.message}\n\nPlease verify WebGPU compatibility or re-download the model in Settings.`,
-          timestamp: Date.now(),
-          time: formatTime(),
-          isError: true
-        });
-      }
+      return true;
+    } catch (err) {
+      console.warn('[WebLLM] Inference error:', err);
+      return false;
     } finally {
       removeLoading();
       state.isWaiting = false;
@@ -3623,32 +3874,38 @@ async function submitMessage(text) {
       updateEngineIndicator();
       messageInput.focus();
     }
+  }
+
+  // Tier Execution Routing Logic
+  // Explicitly forced offline knowledge or DS exam mode offline
+  if (enginePref === 'offline_knowledge' || (requestedMode === 'data_structures' && (!isOnline || examModeActive))) {
+    await runOfflineKnowledgeAssistant();
     return;
   }
 
-  // ── Branch B: Execute with Gemini AI (Cloud API) ────────────────────────────
-  if (!isOnline) {
-    appendMessageToActive({
-      id: generateId('msg'),
-      role: 'model',
-      content: '⚠️ **You are currently offline.**\n\nGemini AI requires an active internet connection. To chat offline, please enable **Local AI** in **Settings (⚙️)**.',
-      timestamp: Date.now(),
-      time: formatTime(),
-      isError: true
-    });
-    showToast('Offline: Gemini AI requires internet. Local AI is available in Settings.', 'warn');
-    state.isWaiting = false;
-    updateComposerButtons();
+  // Exam mode enforces on-device execution: WebLLM -> Chrome AI -> Local Service -> Offline Knowledge
+  if (examModeActive || enginePref === 'local' || !isOnline) {
+    const webllmSuccess = await runWebLLM();
+    if (webllmSuccess) return;
+
+    const chromeSuccess = await runChromeBuiltInAI();
+    if (chromeSuccess) return;
+
+    const localSvcSuccess = await runLocalAIService();
+    if (localSvcSuccess) return;
+
+    // Fall back to Offline Knowledge Assistant
+    await runOfflineKnowledgeAssistant();
     return;
   }
 
+  // Otherwise: Online Gemini (Tier 1) with full resilient fallbacks (2 -> 3 -> 4 -> 5)
   showLoading();
-
   try {
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
+      body: JSON.stringify({
         message: promptText,
         history,
         mode: requestedMode,
@@ -3672,36 +3929,45 @@ async function submitMessage(text) {
         content: data.reply,
         timestamp: Date.now(),
         time: formatTime(),
+        engine: 'gemini',
         isError: false
       });
+      return;
     } else {
-      const errText = buildErrorMessage(res.status, data);
-      appendMessageToActive({
-        id: generateId('msg'),
-        role: 'model',
-        content: errText,
-        timestamp: Date.now(),
-        time: formatTime(),
-        isError: true
-      });
+      throw new Error(data?.message || 'Gemini API response error');
     }
-
-  } catch (err) {
+  } catch (geminiErr) {
     removeLoading();
     state.isWaiting = false;
-    const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) ||
-      (err && err.message && (err.message.includes('offline') || err.message.includes('Failed to fetch')));
-    const offlineText = '⚠️ **Offline Mode:** Unable to connect to Google Gemini AI. Please check your internet connection and try again.';
-    const normalText = `**Network error:** Could not reach the server. Please verify that the Node.js server is running.\n\n\`${err.message}\``;
+    console.warn('[Gemini] Request failed, initiating resilient failover chain:', geminiErr);
 
-    appendMessageToActive({
-      id: generateId('msg'),
-      role: 'model',
-      content: isOffline ? offlineText : normalText,
-      timestamp: Date.now(),
-      time: formatTime(),
-      isError: true
-    });
+    // Resilient Failover: If network drops, automatically answer using the on-device Local AI model
+    if (localAi) {
+      try {
+        const verification = await localAi.verifyModelInstallation();
+        if (verification.installed) {
+          updateEngineIndicator('running', 'Local AI (Failover)');
+        }
+      } catch (_) {}
+    }
+
+    showToast('⚠️ Cloud API unavailable. Falling back through local offline engines...', 'info');
+
+    // Tier 2: WebLLM
+    const webllmSuccess = await runWebLLM();
+    if (webllmSuccess) return;
+
+    // Tier 3: Chrome AI
+    const chromeSuccess = await runChromeBuiltInAI();
+    if (chromeSuccess) return;
+
+    // Tier 4: Local Service
+    const localSvcSuccess = await runLocalAIService();
+    if (localSvcSuccess) return;
+
+    // Tier 5: Offline Knowledge Assistant
+    await runOfflineKnowledgeAssistant();
+    return;
   } finally {
     state.isWaiting = false;
     updateComposerButtons();
@@ -3750,6 +4016,7 @@ function buildErrorMessage(status, data) {
 ───────────────────────────────────────────────────────────────── */
 const MODE_DESCRIPTIONS = {
   standard: 'Standard Academic (Balanced collegiate assistant)',
+  data_structures: 'Data Structures Exam Mode (10-point teaching, C code, dry runs & viva)',
   simple: 'Simple Explanation (Intuitive analogies & plain language)',
   step_by_step: 'Step-by-Step Learning (Sequential stage-by-stage progression)',
   exam_prep: 'Exam Preparation (Definitions, formulas & high-yield traps)',
@@ -4910,40 +5177,51 @@ async function initLocalAiSettings() {
   async function refreshModelStatus() {
     if (!localModelSelect) return;
     const modelId = localModelSelect.value;
-    const modelInfo = localAi.SUPPORTED_MODELS.find(m => m.id === modelId);
+    const modelInfo = localAi.SUPPORTED_MODELS.find(m => m.id === modelId) || localAi.SUPPORTED_MODELS[0];
 
     if (modelSpecsDesc && modelInfo) {
       modelSpecsDesc.textContent = `${modelInfo.name} (${modelInfo.sizeEstimate}, ${modelInfo.vramEstimate})`;
     }
 
-    const isCached = await localAi.isModelCached(modelId);
+    const verification = typeof localAi.verifyModelInstallation === 'function'
+      ? await localAi.verifyModelInstallation(modelId)
+      : { installed: await localAi.isModelCached(modelId), status: (await localAi.isModelCached(modelId)) ? 'ready' : 'not_installed' };
+
     const isEngineLoaded = localAi.getActiveEngine() && localAi.getActiveModelId() === modelId;
 
     if (modelCacheBadge && modelCacheStatusDesc && downloadModelBtn && deleteModelBtn) {
       if (isEngineLoaded) {
         hideLocalAiDiagnostic();
-        modelCacheBadge.textContent = 'Ready in WebGPU ✓';
+        modelCacheBadge.textContent = 'Installed & Active in WebGPU ✓';
         modelCacheBadge.className = 'status-badge-inline status-online';
-        modelCacheStatusDesc.textContent = 'Model loaded in GPU VRAM and ready for instant offline inference.';
+        modelCacheStatusDesc.textContent = `Installed (${verification.record?.sizeEstimate || modelInfo.sizeEstimate}). Loaded in GPU VRAM and ready for instant offline inference.`;
         downloadModelBtn.textContent = 'Model Ready ✓';
         downloadModelBtn.disabled = true;
         deleteModelBtn.style.display = 'inline-block';
         if (testInferenceBtn) testInferenceBtn.style.display = 'inline-block';
-      } else if (isCached) {
+      } else if (verification.installed && verification.status === 'ready') {
         hideLocalAiDiagnostic();
-        modelCacheBadge.textContent = 'Cached Locally ✓';
+        modelCacheBadge.textContent = 'Installed & Cached Locally ✓';
         modelCacheBadge.className = 'status-badge-inline status-online';
-        modelCacheStatusDesc.textContent = 'Model weights cached in browser storage. Ready for offline inference.';
-        downloadModelBtn.textContent = 'Initialize in GPU';
+        modelCacheStatusDesc.textContent = `Installed (${verification.record?.sizeEstimate || modelInfo.sizeEstimate}). Stored in persistent browser cache. Ready for zero-internet examination use.`;
+        downloadModelBtn.textContent = 'Pre-load into GPU';
         downloadModelBtn.disabled = false;
         deleteModelBtn.style.display = 'inline-block';
         if (testInferenceBtn) testInferenceBtn.style.display = 'inline-block';
-      } else {
-        modelCacheBadge.textContent = 'Not Downloaded';
+      } else if (verification.status === 'corrupted') {
+        modelCacheBadge.textContent = 'Model Recovery Required ⚠️';
         modelCacheBadge.className = 'status-badge-inline status-offline';
-        modelCacheStatusDesc.textContent = 'Model weights not yet cached. Click Download Model while online.';
+        modelCacheStatusDesc.textContent = 'Model files missing or incomplete in browser storage. Click "Repair & Re-install" below.';
+        downloadModelBtn.textContent = 'Repair & Re-install Model';
+        downloadModelBtn.disabled = false;
+        deleteModelBtn.style.display = 'inline-block';
+        if (testInferenceBtn) testInferenceBtn.style.display = 'none';
+      } else {
+        modelCacheBadge.textContent = 'Not Installed';
+        modelCacheBadge.className = 'status-badge-inline status-offline';
+        modelCacheStatusDesc.textContent = `One-time installation required (~${modelInfo.sizeEstimate}). Once installed, works permanently offline.`;
         if (downloadModelBtn.textContent !== 'Retry Download') {
-          downloadModelBtn.textContent = 'Download Model';
+          downloadModelBtn.textContent = 'Install Model (One-Time Setup)';
         }
         downloadModelBtn.disabled = false;
         deleteModelBtn.style.display = 'none';
@@ -4965,29 +5243,53 @@ async function initLocalAiSettings() {
     await refreshModelStatus();
   }
 
-  // 5. Download Model Button
+  // 5. Download / Install Model Button
   if (downloadModelBtn) {
     downloadModelBtn.onclick = async () => {
       const modelId = localModelSelect ? localModelSelect.value : localAi.getSelectedModelId();
+      const verification = typeof localAi.verifyModelInstallation === 'function'
+        ? await localAi.verifyModelInstallation(modelId)
+        : { installed: false, status: 'not_installed' };
+
       hideLocalAiDiagnostic();
+
+      if (verification.installed && downloadModelBtn.textContent.includes('Pre-load')) {
+        downloadModelBtn.disabled = true;
+        downloadModelBtn.textContent = 'Initializing in GPU...';
+        try {
+          await localAi.initEngine(modelId);
+          showToast('Model loaded into WebGPU memory!', 'success');
+          await refreshModelStatus();
+          updateEngineIndicator();
+        } catch (e) {
+          showToast(`GPU Init error: ${e.message}`, 'error');
+          downloadModelBtn.disabled = false;
+        }
+        return;
+      }
+
       downloadModelBtn.disabled = true;
-      downloadModelBtn.textContent = 'Downloading...';
+      downloadModelBtn.textContent = verification.status === 'corrupted' ? 'Repairing Model...' : 'Installing Model...';
       if (deleteModelBtn) deleteModelBtn.style.display = 'none';
       if (localAiProgressWrap) localAiProgressWrap.removeAttribute('hidden');
 
-      updateEngineIndicator('downloading', 'Downloading Model (0%)');
+      updateEngineIndicator('downloading', 'Installing Model (0%)');
 
       try {
-        await localAi.initEngine(modelId, (report) => {
+        const installFn = (verification.status === 'corrupted' && typeof localAi.recoverModel === 'function')
+          ? localAi.recoverModel
+          : (typeof localAi.installModel === 'function' ? localAi.installModel : localAi.initEngine);
+
+        await installFn(modelId, (report) => {
           const p = Math.round((report.progress || 0) * 100);
           if (localAiProgressFill) localAiProgressFill.style.width = `${p}%`;
           if (localAiProgressPercent) localAiProgressPercent.textContent = `${p}%`;
           if (p >= 100 && report.text && (report.text.includes('Loading') || report.text.includes('model'))) {
-            if (localAiProgressText) localAiProgressText.textContent = 'Initializing WebGPU shaders & allocating GPU VRAM...';
-            updateEngineIndicator('downloading', 'Initializing WebGPU...');
+            if (localAiProgressText) localAiProgressText.textContent = 'Compiling WebGPU shaders & allocating GPU VRAM...';
+            updateEngineIndicator('downloading', 'Compiling WebGPU...');
           } else {
             if (localAiProgressText) localAiProgressText.textContent = report.text || 'Downloading model weights...';
-            updateEngineIndicator('downloading', `Downloading (${p}%)`);
+            updateEngineIndicator('downloading', `Installing (${p}%)`);
           }
         });
 
@@ -4997,7 +5299,7 @@ async function initLocalAiSettings() {
           throw new Error('Model initialization completed, but local cache verification failed. Model was not detected in browser storage.');
         }
 
-        showToast('Local AI model downloaded, initialized in WebGPU, and stored persistently!', 'success');
+        showToast('🎉 Local AI model installed, initialized in WebGPU, and stored permanently!', 'success');
         if (localAiProgressWrap) localAiProgressWrap.setAttribute('hidden', '');
         hideLocalAiDiagnostic();
         await refreshModelStatus();
@@ -5016,23 +5318,38 @@ async function initLocalAiSettings() {
     };
   }
 
-  // 6. Delete Local Model Button
+  // 6. Delete Local Model Button (with explicit confirmation to prevent accidental deletion)
   if (deleteModelBtn) {
     deleteModelBtn.onclick = async () => {
       const modelId = localModelSelect ? localModelSelect.value : localAi.getSelectedModelId();
-      if (!confirm(`Are you sure you want to delete the local cache for ${modelId}?\nYou will need internet to re-download it.`)) {
+      const modelInfo = localAi.SUPPORTED_MODELS.find(m => m.id === modelId) || localAi.SUPPORTED_MODELS[0];
+      const confirmMsg = `⚠️ Delete Local Model?\n\nAre you sure you want to delete the installed model for ${modelInfo.name}?\n\n` +
+        `This will remove the downloaded weights (~${modelInfo.sizeEstimate}) from your browser's persistent storage.\n\n` +
+        `You will need an active internet connection to download and install it again.`;
+
+      if (!confirm(confirmMsg)) {
         return;
       }
       try {
         await localAi.deleteLocalModel(modelId);
-        showToast('Local model cache deleted from browser storage.', 'info');
+        if (typeof localAi.deleteInstallationRecord === 'function') {
+          await localAi.deleteInstallationRecord(modelId);
+        }
+        showToast('Local model deleted from browser storage.', 'info');
         hideLocalAiDiagnostic();
-        if (downloadModelBtn) downloadModelBtn.textContent = 'Download Model';
+        if (downloadModelBtn) downloadModelBtn.textContent = 'Install Model (One-Time Setup)';
         await refreshModelStatus();
         updateEngineIndicator();
       } catch (err) {
         showToast(`Could not delete model: ${err.message}`, 'error');
       }
+    };
+  }
+
+  // 6b. Examination Mode Toggle inside Settings
+  if (settingsExamModeToggleBtn) {
+    settingsExamModeToggleBtn.onclick = () => {
+      toggleExamMode();
     };
   }
 
@@ -5120,6 +5437,472 @@ async function initLocalAiSettings() {
         grantStoragePersistBtn.disabled = false;
       }
     };
+  }
+
+  // 10. Offline Intelligence Diagnostics Scanner & Auto-Detection (Part 1)
+  async function refreshOfflineIntelligence() {
+    if (!offlineIntelligenceStatusBadge || !window.LocalAIDetector) return;
+    try {
+      const diag = await window.LocalAIDetector.detectAllLocalAIOptions({ localAiInstance: localAi });
+      offlineIntelligenceStatusBadge.textContent = diag.status;
+      if (diag.status === 'Local AI model available' || diag.status === 'Chrome built-in AI available' || diag.status === 'Offline knowledge assistant available') {
+        offlineIntelligenceStatusBadge.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 600;';
+      } else {
+        offlineIntelligenceStatusBadge.style.cssText = 'background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600;';
+      }
+
+      if (intelCheckWebLLMBadge) {
+        intelCheckWebLLMBadge.textContent = diag.webllm?.cached ? 'Cached ✓' : (diag.webllm?.supported ? 'Supported' : 'No WebGPU');
+        intelCheckWebLLMBadge.style.color = diag.webllm?.cached ? '#10b981' : (diag.webllm?.supported ? '#3b82f6' : '#ef4444');
+      }
+      if (intelCheckWebLLMDesc) {
+        intelCheckWebLLMDesc.textContent = diag.webllm?.cached
+          ? `Model ${diag.webllm.modelId || 'Qwen'} ready in browser storage`
+          : (diag.webllm?.supported ? 'WebGPU active; model download pending' : 'WebGPU not supported on this browser/GPU');
+      }
+
+      if (intelCheckChromeBadge) {
+        intelCheckChromeBadge.textContent = diag.chromeAI?.available ? 'Available ✓' : 'Unavailable';
+        intelCheckChromeBadge.style.color = diag.chromeAI?.available ? '#10b981' : 'var(--text-muted, #64748b)';
+      }
+      if (intelCheckChromeDesc) {
+        intelCheckChromeDesc.textContent = diag.chromeAI?.available
+          ? 'window.ai Prompt API (Gemini Nano) detected'
+          : 'Prompt API not enabled in this browser';
+      }
+
+      if (intelCheckOllamaBadge) {
+        intelCheckOllamaBadge.textContent = diag.localService?.available ? 'Connected ✓' : 'Not Connected';
+        intelCheckOllamaBadge.style.color = diag.localService?.available ? '#10b981' : 'var(--text-muted, #64748b)';
+      }
+      if (intelCheckOllamaDesc) {
+        intelCheckOllamaDesc.textContent = diag.localService?.available
+          ? `Endpoint online (${diag.localService.endpoint || 'http://localhost:11434'})`
+          : 'No local Ollama or AI endpoint responding';
+      }
+
+      if (intelCheckKnowledgeBadge) {
+        intelCheckKnowledgeBadge.textContent = `${diag.knowledgeBase?.topicCount || 7} Units Ready ✓`;
+        intelCheckKnowledgeBadge.style.color = '#10b981';
+      }
+
+      if (activeResolvedEngineName) {
+        const route = await window.LocalAIDetector.resolveActiveResponseEngine({
+          forcedEngine: enginePrefSelect ? enginePrefSelect.value : 'auto',
+          examMode: localAi.getExamModeActive ? localAi.getExamModeActive() : false,
+          online: navigator.onLine
+        });
+        activeResolvedEngineName.textContent = route.name;
+        activeResolvedEngineName.className = `msg-engine-badge ${route.badgeClass}`;
+      }
+    } catch (err) {
+      console.warn('[Detector] Diagnostic refresh error:', err);
+    }
+  }
+
+  if (rescanIntelligenceBtn) {
+    rescanIntelligenceBtn.onclick = async () => {
+      rescanIntelligenceBtn.disabled = true;
+      rescanIntelligenceBtn.textContent = 'Scanning...';
+      await refreshOfflineIntelligence();
+      rescanIntelligenceBtn.disabled = false;
+      rescanIntelligenceBtn.textContent = 'Rescan AI';
+      showToast('Local AI availability diagnostics updated.', 'info');
+    };
+  }
+
+  await refreshOfflineIntelligence();
+
+  // 11. Offline Package Manager Integration (Export & Import System)
+  await initOfflinePackageManagerSettings(localAi, refreshModelStatus, refreshExamReadiness, refreshOfflineIntelligence);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   OFFLINE PACKAGE MANAGER SETTINGS CONTROLLER (Export & Import)
+───────────────────────────────────────────────────────────────── */
+async function initOfflinePackageManagerSettings(localAi, refreshModelStatus, refreshExamReadiness, refreshOfflineIntelligence) {
+  const pkgDeviceIcon = document.getElementById('pkgDeviceIcon');
+  const pkgDeviceDesc = document.getElementById('pkgDeviceDesc');
+  const pkgDeviceBadge = document.getElementById('pkgDeviceBadge');
+  const pkgMobileAlertBanner = document.getElementById('pkgMobileAlertBanner');
+  const pkgMobileAlertMessage = document.getElementById('pkgMobileAlertMessage');
+  const pkgMetaModelName = document.getElementById('pkgMetaModelName');
+  const packageProgressWrap = document.getElementById('packageProgressWrap');
+  const packageProgressFill = document.getElementById('packageProgressFill');
+  const packageProgressPercent = document.getElementById('packageProgressPercent');
+  const packageProgressText = document.getElementById('packageProgressText');
+  const packageInfoDisplay = document.getElementById('packageInfoDisplay');
+  const exportPackageBtn = document.getElementById('exportPackageBtn');
+  const importPackageBtn = document.getElementById('importPackageBtn');
+  const offlinePackageFileInput = document.getElementById('offlinePackageFileInput');
+  const verifyPackageBtn = document.getElementById('verifyPackageBtn');
+  const comprehensiveReadinessBtn = document.getElementById('comprehensiveReadinessBtn');
+
+  if (!window.OfflinePackageManager) return;
+
+  // 1. Device Hardware & Compatibility Update
+  async function updatePackageDeviceUI() {
+    try {
+      const caps = await window.OfflinePackageManager.detectDeviceCapabilities();
+      if (pkgDeviceDesc) {
+        const memStr = caps.memoryGB ? `${caps.memoryGB} GB RAM` : 'Standard RAM';
+        const gpuStr = caps.webgpuSupported ? (caps.adapterInfo?.description || 'WebGPU Active') : 'No WebGPU';
+        const deviceType = caps.isMobile ? (caps.isAndroid ? 'Android Device' : (caps.isIOS ? 'iOS Device' : 'Mobile Browser')) : 'Desktop Browser';
+        pkgDeviceDesc.textContent = `${deviceType} • ${memStr} • ${gpuStr}`;
+      }
+      if (pkgDeviceBadge) {
+        if (caps.webgpuSupported) {
+          pkgDeviceBadge.textContent = caps.isMobile ? 'Mobile WebGPU Ready' : 'Desktop WebGPU Ready';
+          pkgDeviceBadge.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);';
+        } else {
+          pkgDeviceBadge.textContent = 'WebGPU Unsupported';
+          pkgDeviceBadge.style.cssText = 'background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);';
+        }
+      }
+      if (pkgDeviceIcon) {
+        pkgDeviceIcon.textContent = caps.isMobile ? '📱' : '💻';
+      }
+      if (pkgMetaModelName && localAi) {
+        const currentModel = localAi.getSelectedModelId();
+        pkgMetaModelName.textContent = currentModel.split('-')[0] + ' ' + (currentModel.includes('0.5B') ? '0.5B' : '1.5B');
+      }
+      if (pkgMobileAlertBanner) {
+        if (caps.isMobile) {
+          pkgMobileAlertBanner.style.display = 'block';
+          if (pkgMobileAlertMessage && caps.warnings && caps.warnings.length) {
+            pkgMobileAlertMessage.textContent = caps.warnings.join(' ');
+          }
+        } else {
+          pkgMobileAlertBanner.style.display = 'none';
+        }
+      }
+    } catch (e) {
+      console.warn('[OfflinePackageManager] Device check error:', e);
+    }
+  }
+
+  await updatePackageDeviceUI();
+
+  const setProgress = (percent, text) => {
+    if (!packageProgressWrap) return;
+    packageProgressWrap.removeAttribute('hidden');
+    if (packageProgressFill) packageProgressFill.style.width = `${percent}%`;
+    if (packageProgressPercent) packageProgressPercent.textContent = `${percent}%`;
+    if (packageProgressText) packageProgressText.textContent = text;
+  };
+
+  const hideProgress = (delay = 1500) => {
+    setTimeout(() => {
+      if (packageProgressWrap) packageProgressWrap.setAttribute('hidden', '');
+    }, delay);
+  };
+
+  // 2. Export Button Action
+  if (exportPackageBtn) {
+    exportPackageBtn.onclick = async () => {
+      exportPackageBtn.disabled = true;
+      exportPackageBtn.innerHTML = '<span>⏳</span> Exporting Package...';
+      if (packageInfoDisplay) {
+        packageInfoDisplay.style.display = 'block';
+        packageInfoDisplay.innerHTML = '<div style="font-weight:600;color:var(--primary);">📦 Initializing StudyMate Offline Package Export...</div>';
+      }
+
+      try {
+        const currentModel = localAi ? localAi.getSelectedModelId() : 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC';
+        const exportRes = await window.OfflinePackageManager.exportOfflinePackage({
+          modelId: currentModel,
+          onProgress: ({ percent, statusText }) => {
+            setProgress(percent, statusText);
+            if (packageInfoDisplay) {
+              packageInfoDisplay.innerHTML = `<div><b>Exporting:</b> ${percent}% — ${statusText}</div>`;
+            }
+          },
+          onStatus: (statusText) => {
+            if (packageInfoDisplay) {
+              packageInfoDisplay.innerHTML += `<div>ℹ️ ${statusText}</div>`;
+            }
+          }
+        });
+
+        hideProgress();
+        showToast('Complete offline package exported successfully!', 'success');
+        if (packageInfoDisplay) {
+          packageInfoDisplay.innerHTML = `
+            <div style="color: #10b981; font-weight: 700; margin-bottom: 4px;">✅ Export Complete: ${exportRes.filename}</div>
+            <div style="font-size: 0.76rem; color: var(--text-muted);">
+              Total Files: <b>${exportRes.totalFiles}</b> | Archive Size: <b>${(exportRes.totalSizeBytes / (1024 * 1024)).toFixed(1)} MB</b><br>
+              Includes: Model Weights &amp; Shards, Tokenizer, Configs, 9 Data Structures Units, WebLLM Runtime, and SHA-256 Checksums.<br>
+              <i>File download initiated automatically in your browser.</i>
+            </div>
+          `;
+        }
+      } catch (err) {
+        hideProgress(500);
+        showToast(`Export failed: ${err.message}`, 'error');
+        if (packageInfoDisplay) {
+          packageInfoDisplay.innerHTML = `<div style="color: #ef4444; font-weight: 600;">❌ Export Error: ${err.message}</div>`;
+        }
+      } finally {
+        exportPackageBtn.disabled = false;
+        exportPackageBtn.innerHTML = '<span>📦</span> Export Complete Offline Package';
+      }
+    };
+  }
+
+  // 3. Import Button Action
+  if (importPackageBtn && offlinePackageFileInput) {
+    importPackageBtn.onclick = () => {
+      offlinePackageFileInput.click();
+    };
+
+    offlinePackageFileInput.onchange = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      importPackageBtn.disabled = true;
+      importPackageBtn.innerHTML = '<span>⏳</span> Importing...';
+      if (packageInfoDisplay) {
+        packageInfoDisplay.style.display = 'block';
+        packageInfoDisplay.innerHTML = `<div style="font-weight:600;color:var(--primary);">📥 Reading package archive: ${file.name}...</div>`;
+      }
+
+      try {
+        const importRes = await window.OfflinePackageManager.importOfflinePackage(file, {
+          onProgress: ({ percent, statusText }) => {
+            setProgress(percent, statusText);
+            if (packageInfoDisplay) {
+              packageInfoDisplay.innerHTML = `<div><b>Importing:</b> ${percent}% — ${statusText}</div>`;
+            }
+          },
+          onStatus: (statusText) => {
+            if (packageInfoDisplay) {
+              packageInfoDisplay.innerHTML += `<div>ℹ️ ${statusText}</div>`;
+            }
+          }
+        });
+
+        hideProgress();
+        showToast('Offline package installed and model ready for offline examination use!', 'success');
+
+        if (refreshModelStatus) await refreshModelStatus();
+        if (refreshExamReadiness) await refreshExamReadiness();
+        if (refreshOfflineIntelligence) await refreshOfflineIntelligence();
+        await updatePackageDeviceUI();
+
+        if (packageInfoDisplay) {
+          packageInfoDisplay.innerHTML = `
+            <div style="color: #10b981; font-weight: 700; margin-bottom: 4px;">✅ Package Successfully Installed!</div>
+            <div style="font-size: 0.76rem; color: var(--text-muted);">
+              Installed Model: <b>${importRes.manifest.model.modelName}</b> (${importRes.modelId})<br>
+              Injected into Browser CacheStorage: Shards, configs, tokenizer, and 9 Data Structures units.<br>
+              <b>Status: 100% Ready for Zero-Internet Offline Use.</b>
+            </div>
+          `;
+        }
+      } catch (err) {
+        hideProgress(500);
+        showToast(`Import failed: ${err.message}`, 'error');
+        if (packageInfoDisplay) {
+          packageInfoDisplay.innerHTML = `<div style="color: #ef4444; font-weight: 600;">❌ Import Error: ${err.message}</div>`;
+        }
+      } finally {
+        importPackageBtn.disabled = false;
+        importPackageBtn.innerHTML = '<span>📥</span> Import Offline Package (.zip)';
+        offlinePackageFileInput.value = '';
+      }
+    };
+  }
+
+  // 4. Verify Package Button
+  if (verifyPackageBtn) {
+    verifyPackageBtn.onclick = () => {
+      const verifyInput = document.createElement('input');
+      verifyInput.type = 'file';
+      verifyInput.accept = '.zip';
+      verifyInput.style.display = 'none';
+      document.body.appendChild(verifyInput);
+
+      verifyInput.onchange = async () => {
+        const file = verifyInput.files && verifyInput.files[0];
+        document.body.removeChild(verifyInput);
+        if (!file) return;
+
+        verifyPackageBtn.disabled = true;
+        verifyPackageBtn.innerHTML = '<span>⏳</span> Verifying...';
+        if (packageInfoDisplay) {
+          packageInfoDisplay.style.display = 'block';
+          packageInfoDisplay.innerHTML = `<div style="font-weight:600;color:var(--primary);">🔍 Verifying cryptographic integrity: ${file.name}...</div>`;
+        }
+
+        try {
+          const verifyRes = await window.OfflinePackageManager.importOfflinePackage(file, {
+            verifyOnly: true,
+            onProgress: ({ percent, statusText }) => {
+              setProgress(percent, statusText);
+              if (packageInfoDisplay) {
+                packageInfoDisplay.innerHTML = `<div><b>Verifying:</b> ${percent}% — ${statusText}</div>`;
+              }
+            }
+          });
+
+          hideProgress();
+          showToast('Package cryptographic integrity verified (100% valid)!', 'success');
+
+          if (packageInfoDisplay) {
+            packageInfoDisplay.innerHTML = `
+              <div style="color: #10b981; font-weight: 700; margin-bottom: 4px;">✅ Verification PASSED: ${file.name}</div>
+              <div style="font-size: 0.76rem; color: var(--text-muted);">
+                Model: <b>${verifyRes.manifest.model.modelName}</b><br>
+                Total Verified Files: <b>${verifyRes.totalFiles}</b> | All SHA-256 Checksums Validated<br>
+                Security: <b>Clean (Zero Path Traversal, Zero Sensitive Data)</b><br>
+                WebGPU &amp; Mobile Compatibility: <b>Compatible</b>
+              </div>
+            `;
+          }
+        } catch (err) {
+          hideProgress(500);
+          showToast(`Verification failed: ${err.message}`, 'error');
+          if (packageInfoDisplay) {
+            packageInfoDisplay.innerHTML = `<div style="color: #ef4444; font-weight: 600;">❌ Verification FAILED: ${err.message}</div>`;
+          }
+        } finally {
+          verifyPackageBtn.disabled = false;
+          verifyPackageBtn.innerHTML = '<span>🔍</span> Verify Package';
+        }
+      };
+
+      verifyInput.click();
+    };
+  }
+
+  // 5. 9-Step Offline Readiness Test
+  if (comprehensiveReadinessBtn) {
+    comprehensiveReadinessBtn.onclick = async () => {
+      comprehensiveReadinessBtn.disabled = true;
+      comprehensiveReadinessBtn.innerHTML = '<span>⏳</span> Running 9-Step Audit...';
+      if (packageInfoDisplay) {
+        packageInfoDisplay.style.display = 'block';
+        packageInfoDisplay.innerHTML = '<div style="font-weight:700;color:var(--primary);margin-bottom:6px;">⚡ Running 9-Step Comprehensive Offline Readiness Test...</div>';
+      }
+
+      try {
+        const testReport = await window.OfflinePackageManager.runComprehensiveOfflineTest({
+          onStepProgress: (step) => {
+            if (packageInfoDisplay) {
+              const badgeClass = step.status.toLowerCase();
+              packageInfoDisplay.innerHTML += `
+                <div class="pkg-report-step">
+                  <div>
+                    <b>Step ${step.step}: ${step.name}</b>
+                    <div style="color: var(--text-muted); font-size: 0.72rem;">${step.details}</div>
+                  </div>
+                  <span class="pkg-step-badge ${badgeClass}">${step.status}</span>
+                </div>
+              `;
+              packageInfoDisplay.scrollTop = packageInfoDisplay.scrollHeight;
+            }
+          }
+        });
+
+        if (testReport.passed) {
+          showToast('Device is 100% prepared for zero-internet examination use!', 'success');
+          if (packageInfoDisplay) {
+            packageInfoDisplay.innerHTML += `
+              <div style="margin-top: 8px; padding: 6px 8px; border-radius: 6px; background: rgba(16,185,129,0.15); color: #10b981; font-weight: 700; font-size: 0.82rem;">
+                🎓 ALL 9 AUDIT CHECKS PASSED: Ready for Offline Exam Use with Model "${testReport.modelId}".
+              </div>
+            `;
+          }
+        } else {
+          showToast(`Offline readiness audit incomplete: ${testReport.failureReason || 'Action required'}`, 'error');
+          if (packageInfoDisplay) {
+            packageInfoDisplay.innerHTML += `
+              <div style="margin-top: 8px; padding: 6px 8px; border-radius: 6px; background: rgba(239,68,68,0.12); color: #ef4444; font-weight: 600; font-size: 0.8rem;">
+                ⚠️ AUDIT INCOMPLETE: ${testReport.failureReason || 'One or more required steps failed.'}
+              </div>
+            `;
+          }
+        }
+      } catch (auditErr) {
+        showToast(`Audit failed: ${auditErr.message}`, 'error');
+        if (packageInfoDisplay) {
+          packageInfoDisplay.innerHTML += `<div style="color:#ef4444;font-weight:600;margin-top:6px;">❌ Audit Execution Error: ${auditErr.message}</div>`;
+        }
+      } finally {
+        comprehensiveReadinessBtn.disabled = false;
+        comprehensiveReadinessBtn.innerHTML = '<span>⚡</span> 9-Step Offline Readiness Test';
+      }
+    };
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DATA STRUCTURES EXAM TOOLS & SYLLABUS CONTROLLER (Part 6)
+───────────────────────────────────────────────────────────────── */
+function initDataStructuresTools() {
+  if (quickVivaBtn) {
+    quickVivaBtn.addEventListener('click', () => {
+      if (studyModeSelect) {
+        studyModeSelect.value = 'data_structures';
+        state.learningMode = 'data_structures';
+      }
+      messageInput.value = 'What are the top 10 most common college viva examination questions for Data Structures, along with high-scoring model answers and key concepts?';
+      messageInput.style.height = 'auto';
+      messageInput.focus();
+      submitMessage(messageInput.value);
+    });
+  }
+
+  if (quickExplainCodeBtn) {
+    quickExplainCodeBtn.addEventListener('click', () => {
+      if (studyModeSelect) {
+        studyModeSelect.value = 'data_structures';
+        state.learningMode = 'data_structures';
+      }
+      messageInput.value = 'Explain the complete C program implementation for Singly Linked List insertion and deletion with pointer manipulation, malloc, and free.';
+      messageInput.style.height = 'auto';
+      messageInput.focus();
+      submitMessage(messageInput.value);
+    });
+  }
+
+  if (quickDryRunBtn) {
+    quickDryRunBtn.addEventListener('click', () => {
+      if (studyModeSelect) {
+        studyModeSelect.value = 'data_structures';
+        state.learningMode = 'data_structures';
+      }
+      messageInput.value = 'Show a complete step-by-step dry run trace table for Quick Sort Lomuto partitioning on array [10, 80, 30, 90, 40, 50, 70] showing pivot, pointers i and j, and array state after each iteration.';
+      messageInput.style.height = 'auto';
+      messageInput.focus();
+      submitMessage(messageInput.value);
+    });
+  }
+
+  if (syllabusTrackerGrid) {
+    syllabusTrackerGrid.addEventListener('click', (e) => {
+      const pill = e.target.closest('.syllabus-pill');
+      if (!pill) return;
+      const topic = pill.dataset.topic;
+      if (studyModeSelect) {
+        studyModeSelect.value = 'data_structures';
+        state.learningMode = 'data_structures';
+      }
+      const topicPrompts = {
+        searching: 'Explain Binary Search with complete C code, step-by-step dry run on array [11, 22, 33, 44, 55], time complexity, and college viva questions.',
+        sorting: 'Explain Quick Sort Lomuto partitioning with algorithm, complete C program, dry run, and worst-case time complexity.',
+        linked_list: 'Write a complete C program for Singly Linked List with insertion, deletion, and display operations, including node diagrams.',
+        stack: 'Explain Stack implementation using arrays in C with push, pop, peek, overflow/underflow checks, and step-by-step dry run.',
+        queue: 'Explain Linear Queue implementation using arrays in C with front/rear pointers and the false overflow limitation.',
+        circular_queue: 'Explain Circular Queue implementation using arrays and modulo arithmetic (rear + 1) % MAX, with complete C code and dry run.',
+        binary_tree: 'What is a Binary Search Tree (BST)? Provide node struct, insertion, search, and inorder/preorder/postorder traversals in C.'
+      };
+      const text = topicPrompts[topic] || `Explain ${topic} in Data Structures with complete C code and dry run.`;
+      messageInput.value = text;
+      messageInput.style.height = 'auto';
+      messageInput.focus();
+      submitMessage(text);
+    });
   }
 }
 
@@ -6686,6 +7469,31 @@ function initSurfaceOpacity() {
   }
 }
 
+async function checkStartupModelStatus() {
+  try {
+    const localAi = await getLocalAI();
+    if (!localAi) return;
+
+    const startupStatus = typeof localAi.getStartupStatus === 'function'
+      ? await localAi.getStartupStatus()
+      : null;
+
+    if (!startupStatus) return;
+
+    updateExamModeUI(startupStatus.examModeActive);
+    await updateEngineIndicator();
+
+    // If Exam Mode is active or browser is offline with installed model, pre-warm engine in background
+    if (startupStatus.isInstalled && (startupStatus.examModeActive || !startupStatus.isOnline)) {
+      localAi.ensureEngineReady(startupStatus.modelId).catch(err => {
+        console.log('[Startup] Background engine readiness note:', err.message);
+      });
+    }
+  } catch (e) {
+    console.warn('[Startup] Model status check warning:', e);
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────
    INITIALISATION
 ───────────────────────────────────────────────────────────────── */
@@ -6704,6 +7512,12 @@ function initSurfaceOpacity() {
   updateComposerButtons();
   updateStudyPanel();
   updateEngineIndicator();
+
+  // Phase 1-3 & 7: Check startup model installation status and wire exam mode toggle
+  if (examModeToggleBtn) {
+    examModeToggleBtn.addEventListener('click', toggleExamMode);
+  }
+  checkStartupModelStatus();
 
   const storedActiveId = window.localStorage.getItem(ACTIVE_CONV_KEY);
   if (storedActiveId && state.conversations[storedActiveId]) {
@@ -6793,6 +7607,9 @@ function initSurfaceOpacity() {
     applyMode(state.imageGenMode || 'fast');
   }
   initImageModeSelector();
+
+  // Part 6: Initialize Data Structures Exam Tools & Syllabus Tracker
+  initDataStructuresTools();
 
   console.log(
     '%c🎓 StudyMate AI %cModern Academic Assistant Active',

@@ -5,12 +5,13 @@
 
 'use strict';
 
-const CACHE_VERSION = 'v1.2.1';
+const CACHE_VERSION = 'v1.4.0';
 const STATIC_CACHE = `studymate-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `studymate-runtime-${CACHE_VERSION}`;
 
 /**
- * Essential assets required to run the core StudyMate AI interface offline.
+ * Essential assets required to run the core StudyMate AI interface offline,
+ * including local AI detectors, data structures knowledge base, and bundles.
  */
 const PRECACHE_ASSETS = [
   '/',
@@ -20,9 +21,21 @@ const PRECACHE_ASSETS = [
   '/js/chat.js',
   '/js/main.js',
   '/js/local-ai.js',
+  '/js/local-ai-detector.js',
+  '/js/ds-knowledge-engine.js',
+  '/js/offline-package-manager.js',
   '/js/webllm-worker.js',
   '/js/web-llm.js',
   '/js/jszip.min.js',
+  '/knowledge/data-structures/searching.json',
+  '/knowledge/data-structures/sorting.json',
+  '/knowledge/data-structures/linked-lists.json',
+  '/knowledge/data-structures/stacks.json',
+  '/knowledge/data-structures/queues.json',
+  '/knowledge/data-structures/circular-queues.json',
+  '/knowledge/data-structures/binary-trees.json',
+  '/knowledge/data-structures/complexity.json',
+  '/knowledge/data-structures/viva.json',
   '/manifest.webmanifest',
   '/manifest.json',
   '/icons/icon.svg',
