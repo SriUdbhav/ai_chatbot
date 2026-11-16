@@ -30,6 +30,7 @@
   let dsBackToChatBtn = null;
   let dsExpandChatbotBtn = null;
   let dsSidebarOpenBtn = null;
+  let dsStudyPanelToggleBtn = null;
   let dsMiniQAInput = null;
   let dsMiniQASubmitBtn = null;
   let dsMiniQAHints = null;
@@ -90,6 +91,7 @@
     dsBackToChatBtn = document.getElementById('dsBackToChatBtn');
     dsExpandChatbotBtn = document.getElementById('dsExpandChatbotBtn');
     dsSidebarOpenBtn = document.getElementById('dsSidebarOpenBtn');
+    dsStudyPanelToggleBtn = document.getElementById('dsStudyPanelToggleBtn');
     dsMiniQAInput = document.getElementById('dsMiniQAInput');
     dsMiniQASubmitBtn = document.getElementById('dsMiniQASubmitBtn');
     dsMiniQAHints = document.getElementById('dsMiniQAHints');
@@ -177,13 +179,52 @@
       });
     }
 
-    // Mobile sidebar toggle from inside DS Workspace
+    // Left Navigation Sidebar Toggle from inside DS Workspace
     if (dsSidebarOpenBtn) {
-      dsSidebarOpenBtn.addEventListener('click', () => {
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebarOverlay');
-        if (sidebar) sidebar.classList.add('open');
-        if (overlay) overlay.classList.add('active');
+      dsSidebarOpenBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.toggleSidebar === 'function') {
+          window.toggleSidebar();
+        } else {
+          const sidebar = document.getElementById('sidebar');
+          const overlay = document.getElementById('sidebarOverlay');
+          if (window.innerWidth > 900) {
+            const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+            if (sidebar) sidebar.classList.toggle('collapsed', isCollapsed);
+          } else {
+            if (sidebar && sidebar.classList.contains('open')) {
+              sidebar.classList.remove('open', 'active');
+              if (overlay) overlay.classList.remove('visible', 'active');
+            } else if (sidebar) {
+              sidebar.classList.add('open', 'active');
+              if (overlay) overlay.classList.add('visible', 'active');
+            }
+          }
+        }
+      });
+    }
+
+    // Right Study Companion Sidebar Toggle Button
+    if (dsStudyPanelToggleBtn) {
+      dsStudyPanelToggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleStudyCompanion();
+      });
+    }
+
+    // Study Panel close button & overlay sync
+    const studyCloseBtn = document.getElementById('studyPanelCloseBtn');
+    if (studyCloseBtn) {
+      studyCloseBtn.addEventListener('click', () => {
+        updateStudyToggleBtnState(false);
+      });
+    }
+    const studyOverlay = document.getElementById('studyPanelOverlay');
+    if (studyOverlay) {
+      studyOverlay.addEventListener('click', () => {
+        updateStudyToggleBtnState(false);
       });
     }
 
@@ -264,21 +305,105 @@
   }
 
   /**
+   * Check if Study Companion panel is currently visible/open
+   */
+  function isStudyPanelVisible() {
+    const studyPanel = document.getElementById('studyPanel');
+    if (!studyPanel) return false;
+    const isDesktop = window.innerWidth > 1260;
+    if (isDesktop) {
+      return !studyPanel.classList.contains('collapsed') && !document.body.classList.contains('study-panel-collapsed');
+    }
+    return studyPanel.classList.contains('open') || studyPanel.classList.contains('active');
+  }
+
+  /**
+   * Update the Study Companion Toggle Button UI state
+   */
+  function updateStudyToggleBtnState(isVisible) {
+    if (!dsStudyPanelToggleBtn) dsStudyPanelToggleBtn = document.getElementById('dsStudyPanelToggleBtn');
+    if (!dsStudyPanelToggleBtn) return;
+
+    const visible = (typeof isVisible === 'boolean') ? isVisible : isStudyPanelVisible();
+
+    const hideIcon = dsStudyPanelToggleBtn.querySelector('.ds-toggle-icon-hide');
+    const showIcon = dsStudyPanelToggleBtn.querySelector('.ds-toggle-icon-show');
+
+    if (visible) {
+      dsStudyPanelToggleBtn.title = 'Hide Study Companion';
+      dsStudyPanelToggleBtn.setAttribute('aria-label', 'Hide Study Companion');
+      dsStudyPanelToggleBtn.setAttribute('aria-expanded', 'true');
+      dsStudyPanelToggleBtn.classList.remove('panel-hidden');
+      if (hideIcon) hideIcon.style.display = '';
+      if (showIcon) showIcon.style.display = 'none';
+    } else {
+      dsStudyPanelToggleBtn.title = 'Show Study Companion';
+      dsStudyPanelToggleBtn.setAttribute('aria-label', 'Show Study Companion');
+      dsStudyPanelToggleBtn.setAttribute('aria-expanded', 'false');
+      dsStudyPanelToggleBtn.classList.add('panel-hidden');
+      if (hideIcon) hideIcon.style.display = 'none';
+      if (showIcon) showIcon.style.display = '';
+    }
+  }
+
+  /**
+   * Toggle Study Companion sidebar visibility
+   */
+  function toggleStudyCompanion() {
+    const visible = isStudyPanelVisible();
+    if (visible) {
+      if (typeof window.closeStudyPanel === 'function') {
+        window.closeStudyPanel();
+      } else {
+        const studyPanel = document.getElementById('studyPanel');
+        if (studyPanel) {
+          studyPanel.classList.add('collapsed');
+          studyPanel.classList.remove('open', 'active');
+        }
+        document.body.classList.add('study-panel-collapsed');
+        const appWs = document.querySelector('.app-workspace');
+        if (appWs) appWs.classList.add('study-panel-collapsed');
+        const overlay = document.getElementById('studyPanelOverlay');
+        if (overlay) overlay.classList.remove('visible', 'active');
+      }
+      updateStudyToggleBtnState(false);
+    } else {
+      if (typeof window.openStudyPanel === 'function') {
+        window.openStudyPanel();
+      } else {
+        const studyPanel = document.getElementById('studyPanel');
+        if (studyPanel) {
+          studyPanel.classList.remove('collapsed');
+          studyPanel.classList.add('open', 'active');
+        }
+        document.body.classList.remove('study-panel-collapsed');
+        const appWs = document.querySelector('.app-workspace');
+        if (appWs) appWs.classList.remove('study-panel-collapsed');
+        if (window.innerWidth <= 1260) {
+          const overlay = document.getElementById('studyPanelOverlay');
+          if (overlay) overlay.classList.add('visible', 'active');
+        }
+      }
+      updateStudyToggleBtnState(true);
+    }
+  }
+
+  /**
    * Open DS Learning Workspace
    */
   function openWorkspace(topicId) {
     if (!dsLearningWorkspace) return;
 
     isWorkspaceActive = true;
+    document.body.classList.add('ds-mode-active');
+    const appWs = document.querySelector('.app-workspace');
+    if (appWs) appWs.classList.add('ds-mode-active');
+
     dsLearningWorkspace.style.display = 'flex';
 
     if (chatLayout) {
       chatLayout.style.display = 'none';
     }
-
-    // Close right study panel if open
-    const studyPanel = document.getElementById('studyPanel');
-    if (studyPanel) studyPanel.classList.remove('open');
 
     // Update active nav styling in sidebar
     document.querySelectorAll('.nav-menu .nav-item').forEach(el => el.classList.remove('active'));
@@ -296,6 +421,17 @@
       selectTopic(currentTopicId, false);
     }
 
+    // Update Study Companion toggle button state
+    updateStudyToggleBtnState(isStudyPanelVisible());
+
+    // Update Left Sidebar toggle button state
+    const isSidebarCollapsed = document.body.classList.contains('sidebar-collapsed') ||
+      document.documentElement.classList.contains('sidebar-collapsed') ||
+      (sidebar && sidebar.classList.contains('collapsed'));
+    if (typeof window.updateSidebarToggleBtns === 'function') {
+      window.updateSidebarToggleBtns(isSidebarCollapsed);
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -306,6 +442,10 @@
     if (!dsLearningWorkspace) return;
 
     isWorkspaceActive = false;
+    document.body.classList.remove('ds-mode-active');
+    const appWs = document.querySelector('.app-workspace');
+    if (appWs) appWs.classList.remove('ds-mode-active');
+
     dsLearningWorkspace.style.display = 'none';
 
     if (chatLayout) {
@@ -971,7 +1111,10 @@
     setActiveTab: setActiveTab,
     copyCode: copyCurrentCode,
     downloadCode: downloadCurrentCode,
-    search: findAndOpenBestTopicMatch
+    search: findAndOpenBestTopicMatch,
+    toggleStudyCompanion: toggleStudyCompanion,
+    updateStudyToggleBtn: updateStudyToggleBtnState,
+    isStudyPanelVisible: isStudyPanelVisible
   };
 
   // Auto-init on DOMContentLoaded or immediate if ready

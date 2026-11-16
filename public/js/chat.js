@@ -1190,6 +1190,43 @@ function openSidebar() {
   }
 }
 
+function updateSidebarToggleBtns(isCollapsed) {
+  const btns = [document.getElementById('sidebarOpenBtn'), document.getElementById('dsSidebarOpenBtn')];
+  btns.forEach(btn => {
+    if (!btn) return;
+    if (isCollapsed) {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-label', 'Expand Navigation Sidebar');
+      btn.title = 'Expand Navigation Sidebar';
+      btn.classList.add('is-collapsed');
+      const collapseIcon = btn.querySelector('.sidebar-icon-collapse');
+      const expandIcon = btn.querySelector('.sidebar-icon-expand');
+      if (collapseIcon) collapseIcon.style.display = 'none';
+      if (expandIcon) expandIcon.style.display = 'block';
+    } else {
+      btn.setAttribute('aria-expanded', 'true');
+      btn.setAttribute('aria-label', 'Collapse Navigation Sidebar');
+      btn.title = 'Collapse Navigation Sidebar';
+      btn.classList.remove('is-collapsed');
+      const collapseIcon = btn.querySelector('.sidebar-icon-collapse');
+      const expandIcon = btn.querySelector('.sidebar-icon-expand');
+      if (collapseIcon) collapseIcon.style.display = 'block';
+      if (expandIcon) expandIcon.style.display = 'none';
+    }
+  });
+}
+
+function openSidebar() {
+  if (sidebar) {
+    sidebar.classList.add('open', 'active');
+  }
+  if (sidebarOverlay) {
+    sidebarOverlay.classList.add('visible', 'active');
+  }
+  document.body.style.overflow = '';
+  updateSidebarToggleBtns(false);
+}
+
 function closeSidebar() {
   if (sidebar) {
     sidebar.classList.remove('open', 'active');
@@ -1198,8 +1235,8 @@ function closeSidebar() {
     sidebarOverlay.classList.remove('visible', 'active');
   }
   document.body.style.overflow = '';
-  if (sidebarOpenBtn && window.innerWidth <= 900) {
-    sidebarOpenBtn.setAttribute('aria-expanded', 'false');
+  if (window.innerWidth <= 900) {
+    updateSidebarToggleBtns(true);
   }
 }
 
@@ -1213,9 +1250,7 @@ function toggleSidebar() {
     try {
       localStorage.setItem('studymate_sidebar_collapsed', isCollapsed ? 'true' : 'false');
     } catch (e) { }
-    if (sidebarOpenBtn) {
-      sidebarOpenBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-    }
+    updateSidebarToggleBtns(isCollapsed);
   } else {
     if (sidebar && (sidebar.classList.contains('open') || sidebar.classList.contains('active'))) {
       closeSidebar();
@@ -1225,24 +1260,48 @@ function toggleSidebar() {
   }
 }
 
+// Global exposure for DS Learning Module and header shortcuts
+window.toggleSidebar = toggleSidebar;
+window.openSidebar = openSidebar;
+window.closeSidebar = closeSidebar;
+window.updateSidebarToggleBtns = updateSidebarToggleBtns;
+
 function openStudyPanel() {
   closeSidebar();
   if (studyPanel) {
+    studyPanel.classList.remove('collapsed');
     studyPanel.classList.add('open', 'active');
+    document.body.classList.remove('study-panel-collapsed');
+    const appWs = document.querySelector('.app-workspace');
+    if (appWs) appWs.classList.remove('study-panel-collapsed');
   }
   if (studyPanelOverlay) {
     studyPanelOverlay.classList.add('visible', 'active');
+  }
+  if (typeof window.DS_LEARNING_MODULE?.updateStudyToggleBtn === 'function') {
+    window.DS_LEARNING_MODULE.updateStudyToggleBtn(true);
   }
 }
 
 function closeStudyPanel() {
   if (studyPanel) {
+    studyPanel.classList.add('collapsed');
     studyPanel.classList.remove('open', 'active');
+    document.body.classList.add('study-panel-collapsed');
+    const appWs = document.querySelector('.app-workspace');
+    if (appWs) appWs.classList.add('study-panel-collapsed');
   }
   if (studyPanelOverlay) {
     studyPanelOverlay.classList.remove('visible', 'active');
   }
+  if (typeof window.DS_LEARNING_MODULE?.updateStudyToggleBtn === 'function') {
+    window.DS_LEARNING_MODULE.updateStudyToggleBtn(false);
+  }
 }
+
+// Global exposure for DS Learning Module and header shortcuts
+window.openStudyPanel = openStudyPanel;
+window.closeStudyPanel = closeStudyPanel;
 
 if (sidebarOpenBtn) sidebarOpenBtn.addEventListener('click', toggleSidebar);
 if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
