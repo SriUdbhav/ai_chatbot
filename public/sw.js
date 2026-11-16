@@ -5,8 +5,8 @@
 
 'use strict';
 
-// History: CACHE_VERSION = 'v1.2.0', CACHE_VERSION = 'v1.2.1', CACHE_VERSION = 'v1.4.0', CACHE_VERSION = 'v1.5.0'
-const CACHE_VERSION = 'v1.6.0';
+// History: CACHE_VERSION = 'v1.2.0', CACHE_VERSION = 'v1.2.1', CACHE_VERSION = 'v1.4.0', CACHE_VERSION = 'v1.5.0', CACHE_VERSION = 'v1.6.0'
+const CACHE_VERSION = 'v1.7.0';
 const STATIC_CACHE = `studymate-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `studymate-runtime-${CACHE_VERSION}`;
 
@@ -24,6 +24,8 @@ const PRECACHE_ASSETS = [
   '/js/local-ai.js',
   '/js/local-ai-detector.js',
   '/js/ds-knowledge-engine.js',
+  '/js/ds-complete-data.js',
+  '/js/ds-learning-module.js',
   '/js/offline-package-manager.js',
   '/js/webllm-worker.js',
   '/js/web-llm.js',

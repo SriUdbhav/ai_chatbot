@@ -58,6 +58,8 @@
     { url: '/js/local-ai.js', target: 'application/js/local-ai.js' },
     { url: '/js/local-ai-detector.js', target: 'application/js/local-ai-detector.js' },
     { url: '/js/ds-knowledge-engine.js', target: 'application/js/ds-knowledge-engine.js' },
+    { url: '/js/ds-complete-data.js', target: 'application/js/ds-complete-data.js' },
+    { url: '/js/ds-learning-module.js', target: 'application/js/ds-learning-module.js' },
     { url: '/js/offline-package-manager.js', target: 'application/js/offline-package-manager.js' },
     { url: '/js/web-llm.js', target: 'application/js/web-llm.js' },
     { url: '/js/webllm-worker.js', target: 'application/js/webllm-worker.js' },

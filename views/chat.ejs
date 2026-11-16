@@ -115,6 +115,12 @@
           </span>
           <span class="nav-text">Home</span>
         </a>
+        <button type="button" class="nav-item" id="navDSCompleteAnswers" title="DS Complete Answers (Interactive Offline Learning Center)">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><polyline points="10 8 13 11 10 14"></polyline></svg>
+          </span>
+          <span class="nav-text">DS Complete Answers</span>
+        </button>
         <button type="button" class="nav-item" id="navSubjectNotes" title="Subject Notes (Document Reader & Revision Notes)">
           <span class="nav-icon">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -758,6 +764,129 @@
       </footer>
 
     </div><!-- /chat-layout -->
+
+    <!-- ── 2B. DEDICATED DATA STRUCTURES COMPLETE LEARNING WORKSPACE ── -->
+    <div class="ds-learning-workspace" id="dsLearningWorkspace" style="display: none;" role="main" aria-label="Data Structures Complete Learning Center">
+      
+      <!-- Topbar for DS Learning Workspace -->
+      <header class="ds-topbar">
+        <div class="ds-topbar-left">
+          <button class="topbar-menu-btn" id="dsSidebarOpenBtn" aria-label="Toggle navigation sidebar" title="Toggle Navigation Sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="ds-brand-title">
+            <div class="ds-brand-top">
+              <span class="ds-brand-badge">🌳 100% Offline DS Center</span>
+              <span class="ds-stats-pill" id="dsStatsPill">108 Operations</span>
+            </div>
+            <h1 class="ds-title-heading">Data Structures — Complete Answers &amp; Programs</h1>
+          </div>
+        </div>
+        <div class="ds-topbar-right">
+          <button type="button" class="btn-secondary-sm ds-back-chat-btn" id="dsBackToChatBtn" title="Return to Chatbot">
+            <span>💬</span> <span>Back to Chat</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Two-Panel Learning Body -->
+      <div class="ds-learning-body">
+
+        <!-- LEFT PANEL: Topic Navigation, Accordion & Local Search -->
+        <aside class="ds-left-panel" id="dsLeftPanel" aria-label="DS Topics Navigation">
+          
+          <!-- Real-time Filter/Search Box -->
+          <div class="ds-search-wrapper">
+            <span class="ds-search-icon" aria-hidden="true">🔍</span>
+            <input 
+              type="search" 
+              id="dsTopicSearchInput" 
+              class="ds-search-input" 
+              placeholder="Search 108 DS operations..." 
+              aria-label="Search operations"
+              autocomplete="off"
+            >
+            <button type="button" class="ds-search-clear" id="dsSearchClearBtn" title="Clear search" hidden>×</button>
+          </div>
+
+          <!-- Accordion of 7 Categories -->
+          <div class="ds-accordion-container" id="dsAccordionContainer">
+            <!-- Rendered by ds-learning-module.js from DS_COMPLETE_DATA.CATEGORIES -->
+          </div>
+
+          <!-- Left Panel Footer: Mini DS Q&A and Chat Dock -->
+          <div class="ds-left-footer">
+            <div class="ds-mini-qa-box">
+              <div class="ds-mini-qa-header">
+                <span>⚡ Instant Topic Query</span>
+              </div>
+              <div class="ds-mini-qa-input-wrap">
+                <input type="text" id="dsMiniQAInput" placeholder="e.g. 'BST deletion two children'..." aria-label="Instant query input">
+                <button type="button" id="dsMiniQASubmitBtn" title="Find answer">Go</button>
+              </div>
+              <div class="ds-mini-qa-hints" id="dsMiniQAHints">
+                <span class="ds-hint-chip" data-query="linear_search">Linear Search</span>
+                <span class="ds-hint-chip" data-query="quick_sort">Quick Sort</span>
+                <span class="ds-hint-chip" data-query="sll_insert_beginning">Insert at Beginning</span>
+                <span class="ds-hint-chip" data-query="cqueue_enqueue">Circular Queue</span>
+                <span class="ds-hint-chip" data-query="tree_bst_delete_two_children">Delete 2 Children BST</span>
+                <span class="ds-hint-chip" data-query="graph_bfs">BFS Traversal</span>
+              </div>
+            </div>
+
+            <button type="button" class="ds-expand-chatbot-btn" id="dsExpandChatbotBtn" title="Open AI Chatbot">
+              <span class="ds-chat-icon">🤖</span>
+              <span class="ds-chat-text">Open Full AI Chatbot</span>
+              <span class="ds-chat-arrow">→</span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- RIGHT PANEL: 14-Section Operation Study & Code Viewer Area -->
+        <main class="ds-right-panel" id="dsRightPanel" aria-label="Data Structure Topic Details">
+          
+          <!-- Right Panel Sticky Sub-header: Breadcrumbs & Quick Actions -->
+          <div class="ds-detail-header" id="dsDetailHeader">
+            <div class="ds-breadcrumbs">
+              <span id="dsBreadcrumbCategory">Data Structures</span>
+              <span class="ds-breadcrumb-sep">/</span>
+              <span id="dsBreadcrumbSubcategory">Category</span>
+              <span class="ds-breadcrumb-sep">/</span>
+              <span class="ds-breadcrumb-current" id="dsBreadcrumbCurrent">Operation</span>
+            </div>
+
+            <div class="ds-header-actions">
+              <button type="button" class="btn-copy-code-sm" id="dsHeaderCopyCodeBtn" title="Copy C Program">
+                <span>📋</span> <span>Copy C Code</span>
+              </button>
+              <button type="button" class="btn-download-code-sm" id="dsHeaderDownloadCodeBtn" title="Download C Source File">
+                <span>💾</span> <span>Download .c</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Navigation Tabs for Sections -->
+          <div class="ds-section-tabs" id="dsSectionTabs" role="tablist">
+            <button type="button" class="ds-tab-btn active" data-tab="all" role="tab" aria-selected="true">All 14 Sections</button>
+            <button type="button" class="ds-tab-btn" data-tab="concept" role="tab" aria-selected="false">Concept &amp; Definition</button>
+            <button type="button" class="ds-tab-btn" data-tab="algorithm" role="tab" aria-selected="false">Algorithm &amp; Pseudocode</button>
+            <button type="button" class="ds-tab-btn" data-tab="program" role="tab" aria-selected="false">Complete C Program</button>
+            <button type="button" class="ds-tab-btn" data-tab="dryrun" role="tab" aria-selected="false">Dry Run &amp; Output</button>
+            <button type="button" class="ds-tab-btn" data-tab="complexity" role="tab" aria-selected="false">Complexity &amp; Viva</button>
+          </div>
+
+          <!-- Main Scrollable Content Container -->
+          <div class="ds-content-container" id="dsContentContainer">
+            <!-- Rendered by ds-learning-module.js -->
+          </div>
+        </main>
+
+      </div>
+    </div><!-- /ds-learning-workspace -->
 
     <!-- ── 3. RIGHT-SIDE CONTEXTUAL STUDY PANEL (Desktop + Mobile Drawer) ── -->
     <aside class="study-panel" id="studyPanel" role="complementary" aria-label="Contextual Study Panel">
@@ -1973,6 +2102,8 @@
   <!-- Application Logic -->
   <script src="/js/jszip.min.js"></script>
   <script src="/js/ds-knowledge-engine.js"></script>
+  <script src="/js/ds-complete-data.js"></script>
+  <script src="/js/ds-learning-module.js"></script>
   <script src="/js/local-ai-detector.js"></script>
   <script src="/js/offline-package-manager.js"></script>
   <script src="/js/chat.js"></script>
