@@ -170,7 +170,7 @@ runTest('Service Worker Caches DS Modules with Updated Version', () => {
   const swPath = path.join(__dirname, '..', 'public', 'sw.js');
   const swContent = fs.readFileSync(swPath, 'utf8');
 
-  assert(swContent.includes("CACHE_VERSION = 'v1.7.0'"), 'sw.js must be bumped to v1.7.0');
+  assert(/CACHE_VERSION\s*=\s*'v1\.[789]\.0'/.test(swContent), 'sw.js must be bumped to v1.7.0 or v1.8.0');
   assert(swContent.includes("'/js/ds-complete-data.js'"), 'sw.js must precache /js/ds-complete-data.js');
   assert(swContent.includes("'/js/ds-learning-module.js'"), 'sw.js must precache /js/ds-learning-module.js');
 });

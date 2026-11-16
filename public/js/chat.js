@@ -7426,7 +7426,7 @@ function initPwaAndOfflineSupport() {
           if (isCached) {
             bannerText.innerHTML = '<strong>Offline Mode:</strong> On-device Local AI (WebGPU) is active. Ask study or coding questions with zero internet!';
           } else {
-            bannerText.innerHTML = '<strong>Offline Mode:</strong> Gemini cloud paused. To enable offline generative AI, download a model in Settings.';
+            bannerText.innerHTML = '<strong>Offline Mode:</strong> Gemini cloud paused. <strong>DS Complete Answers (108 operations)</strong> and local study tools are fully active.';
           }
         }
       }
@@ -7440,9 +7440,9 @@ function initPwaAndOfflineSupport() {
         } else {
           apiStatusPill.innerHTML = `
             <span class="status-dot dot-amber"></span>
-            <span class="status-text">Offline (Cached)</span>
+            <span class="status-text">Offline Mode</span>
           `;
-          apiStatusPill.title = 'Offline mode — Set up Local AI in Settings for offline responses.';
+          apiStatusPill.title = 'Offline mode — Operating from cached application shell and DS knowledge.';
         }
       }
       if (pwaStatusBadge) {
@@ -7452,14 +7452,14 @@ function initPwaAndOfflineSupport() {
       if (pwaStatusDesc) {
         pwaStatusDesc.textContent = isCached
           ? 'Operating on-device via WebGPU. Full generative responses enabled.'
-          : 'Operating from cached assets. Download model in Settings to chat offline.';
+          : 'Operating from cached assets. DS Complete Answers and local syllabus tools available.';
       }
       updateEngineIndicator();
       if (!isInitial) {
         if (isCached) {
           showToast('Offline Mode: Switched to On-Device Local AI (WebGPU).', 'info');
         } else {
-          showToast('You are offline. Download the local AI model in Settings to chat offline.', 'warn');
+          showToast('Offline Mode: StudyMate AI is running from cache. DS Complete Answers fully available.', 'info');
         }
       }
     } else {
@@ -7470,11 +7470,11 @@ function initPwaAndOfflineSupport() {
         apiStatusPill.title = 'Connected AI Engine';
       }
       if (pwaStatusBadge) {
-        pwaStatusBadge.textContent = 'Active';
+        pwaStatusBadge.textContent = 'Active (Offline Ready)';
         pwaStatusBadge.className = 'status-badge-inline status-online';
       }
       if (pwaStatusDesc) {
-        pwaStatusDesc.textContent = 'Service Worker registered. Core app available offline.';
+        pwaStatusDesc.textContent = 'Service Worker registered. Core app and DS Complete Answers cached offline.';
       }
       updateEngineIndicator();
       if (!isInitial) {
@@ -7488,21 +7488,51 @@ function initPwaAndOfflineSupport() {
   window.addEventListener('offline', () => updateNetworkUI(false, false));
   updateNetworkUI(navigator.onLine, true);
 
-  // Register Service Worker
+  // Register Service Worker with robust offline confirmation and updates
   if ('serviceWorker' in navigator) {
+    // Listen for direct broadcast messages from Service Worker
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'SW_OFFLINE_READY') {
+        console.log('[PWA]', event.data.message || 'StudyMate AI is ready for offline use.');
+        try {
+          if (!sessionStorage.getItem('studymate_sw_notified')) {
+            sessionStorage.setItem('studymate_sw_notified', 'true');
+            showToast('StudyMate AI is ready for offline use. DS Complete Answers & core tools are cached.', 'success');
+          }
+        } catch (_) {}
+      }
+    });
+
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((reg) => {
           console.log('[PWA] Service Worker registered with scope:', reg.scope);
+
+          // Check if already active and controlling
+          if (reg.active && !navigator.serviceWorker.controller) {
+            console.log('[PWA] Service Worker active on initial visit.');
+          }
 
           // Listen for new service worker installation
           reg.addEventListener('updatefound', () => {
             const installingWorker = reg.installing;
             if (installingWorker) {
               installingWorker.addEventListener('statechange', () => {
-                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  console.log('[PWA] New version of StudyMate AI is ready.');
-                  showToast('A newer version of StudyMate AI is ready.', 'info');
+                if (installingWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    // Update to an existing version
+                    console.log('[PWA] New version of StudyMate AI is ready.');
+                    showToast('A newer version of StudyMate AI is ready.', 'info');
+                  } else {
+                    // First-time installation complete
+                    console.log('[PWA] StudyMate AI pre-caching complete. Ready for offline use.');
+                    try {
+                      if (!sessionStorage.getItem('studymate_sw_notified')) {
+                        sessionStorage.setItem('studymate_sw_notified', 'true');
+                        showToast('StudyMate AI is ready for offline use. DS Complete Answers & core tools are cached.', 'success');
+                      }
+                    } catch (_) {}
+                  }
                 }
               });
             }
@@ -7511,6 +7541,20 @@ function initPwaAndOfflineSupport() {
         .catch((err) => {
           console.warn('[PWA] Service Worker registration failed:', err);
         });
+
+      // When service worker is ready, update status
+      navigator.serviceWorker.ready.then(() => {
+        console.log('[PWA] Service Worker is ready and active.');
+        if (pwaStatusBadge && navigator.onLine) {
+          pwaStatusBadge.textContent = 'Active (Offline Ready)';
+          pwaStatusBadge.className = 'status-badge-inline status-online';
+        }
+        if (pwaStatusDesc && navigator.onLine) {
+          pwaStatusDesc.textContent = 'App shell and DS Complete Answers cached for offline use.';
+        }
+      }).catch((err) => {
+        console.warn('[PWA] Service Worker ready error:', err);
+      });
     });
   }
 
